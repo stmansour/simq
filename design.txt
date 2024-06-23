@@ -1,0 +1,156 @@
+SIMQ Scheduler A Simulation Queue Manager For PLATO
+
+Simulations in the PLATO system can take multiple days. The number
+of simulations that we need to do for research is astronomical. The
+number of simulations we need to do validate the Investors we use
+for day-to-day investing is not yet known, but we expect it to also
+be large.
+
+The purpose of SIMQ is to help us address these simulation challenges.
+The tasks before us include: (a) defining many simulation to find
+the best Investor, (b) executing those simulation and preparing the
+results for analysis, and (c) anylazing the results, (d) based on
+learnings: repeat. We are separating the tasks associated with the
+simulations in order to automate each task responsibility of defining
+a simulation from that of running it and collecting the results.
+The SIMQ Scheduler is our first attempt to automate step (b).
+
+The 'scheduler' will handle running the simulations. It will be
+based on a queue of defined simulations. The scheduler will manage
+the queue.  It will insert newly defined simulations and will be
+responsible for assigning them to compute resources that can run
+them and report back with the results. The compute resources can
+be a company server, or a cloud-based resource.  Simulations on
+company servers will be managed based on their capacity. Cloud-based
+servers will be managed based on cost. That is, the scheduler will
+be given a budget for cloud based simulations.  The simulator can
+tell the scheduler how long the simulation will take and provide
+updates during its run for accurate time predictions.  Based on its
+budget, and the cost of the cloud servers, the scheduler will
+initiate cloud based simulations until it runs out of budget.
+
+Simulation jobs are added to a Queue by a client process (psq). The
+user must only supply the config file and CSV database file set (as
+a tar gz file) and a few other bits of information. The psq program
+will contact the scheduler, copy the tar.gz file to a local file
+on the scheduler's system, then add the new simulation request to
+the queue.
+
+Each item in the queue has an assotiated State indicating where it
+is in its lifecycle. The main states are: queued, booked, executing,
+and completed.  There may be some error states as well. The scheduler
+will be responsible for setting and maintaining the State of a job
+in the queue.
+
+We will associate attributes with each of the company servers that
+indicate the number and size of the simulations it can handle.  The
+simulator can parallelize its work over multiple CPUs. The optimal
+number of CPU varies by computer and will be adjusted as we learn
+about them through use. The scheduler will have a limit on the
+number of active cloud-based simulations it can have running at any
+given time. We will raise this limit over time as we assess the
+accuracy of the cost predictions and the reliabilty of the runs.
+The scheduler will keep the company servers running as many simulations
+as they can. And when one simulation completes it will immediately
+start up a new one based on the priorities in the queue.
+
+For cloud based servers, we will pick a class of compute resource
+and adjust its capacity based on our experience.
+
+The simulator supports simtalk. It listens on an HTTP port and can
+be contacted while it is runniing simulations to provide status on
+how far along it is and how much longer it will take to complete.
+The scheduler will use this capability to keep track of all the
+active simulations going on, adjust their completion times, and
+alert us when a simulator cannot be contacted.
+
+Each item in the queue will be given a priority. The scheduler is
+not required to set the priority. It will, however, see to the
+completion of the higher priority simulations first. psq will enable
+users to set the priority of simulations. The priority will be a
+number from 1 (highest priority) to 100 (lowest priority).  If no
+priority is assigned to a simulation by the user, it will receive
+a default prioryt (initially we'll set the default to 50 and see
+how it goes).  The priority of a simulation can be changed up until
+it has been booked for execution.
+
+As handlers become available, the scheduler will assign them
+simulations and provide them with the config file and other information
+needed. The scheduler periodically contacts every active simulator
+at its URL to update its status and completion time. When the
+simulations are completed, the simulator sends back to the scheduler
+the reports it generated and they are saved under the Simulations
+Results Root in the filesystem under a folder for the date on which
+it completed then in a folder whose name is the SID (the Simulation
+ID). The result files are now available for analysis by the team.
+
+Security
+
+There are minimal security risks with these simulations. No real
+money is involved and no personal information. The simulator does
+purely theoretical work. There is no need for concern around
+compliance or any other financial security considerations.
+
+Scalability
+
+Scalability for simq will not be an issue, at least in the near
+term. We will limit the budget on how many cloud-based simulations
+there can be. The simulation times involved with the simulations
+simq will manage will range from hours to days. So, the initial
+implementation will be able to handle many times the workload we
+will give it.  As we gain experience with it, we can identify and
+address any scalability concerns.
+
+Monitoring
+
+The queue itself provides most of the monitoring information we
+will need. Users will be able to see and filter the queue using
+psq.  Issues that may occur when starting up remote simulations
+will be logged in the scheduler's logfile and some will become
+States in the queue. These will be addressed as needed.  As with
+most of the PLATO system, the user interface will be a command-line.
+This minimizes development work and maximizes scriptability of all
+the PLATO components. With the small number of people who need
+access to the PLAT system, this is the most efficient way to work.
+We can revisit specific features for a different user interface if
+the need arises.
+
+Data Management
+
+One of the biggest unforseen benefits of the way the simulator works
+is how small the database is that we need to run these simulations.
+The database fileset and config file in a tar gzipped file is only
+about 1.5MB.  Furthermore, if the simulation uses the standard daily
+produced CSV fileset, the compute resource can pull it from the
+PLATO website as needed. This will mean that we only need the 1.5M
+tar gzipped file in rare cases. So, not much data space will be
+needed to manage the input to the queue.
+
+The output of the queue will be managed on the main PLATO server.
+The output files themselves are mostly text (CSV) files and can be
+zipped if necessary. They will be stored in the Simulations Result
+Root directory on the file system. There is more than enough space
+on the system to support the simulations we need to do for many
+months.  We will monitor the disk usage and upgrade the PLATO server
+with more storage when needed.
+
+A backup of this directory should be done on a nightly basis. We
+can add the creation of a tar gz file of this directory as a nightly
+cron job. As the size of the data grows we may need to look at other
+options, but we should be fine for a few months.
+
+Version Control
+
+To date, there have been very few backward incompatible changes to
+the files needed to do simulations. Should a backwards incompatible
+change occur in the future we will handle it as a one-off scenario.
+Given that there are only 3 people who will be submitting simulations,
+this is managable. If the situation changes, we may need to revisit
+this topic.
+
+Analysis Of Simulation Reports
+
+This is a topic for a different capability of the PLATO system.
+SIMQ will not be responsible for analyzing any of the simulation
+reports.
+
