@@ -21,7 +21,7 @@ install:
 
 test:
 	@touch fail
-	@go test github.com/stmansour/psim/util && rm -f $(TEST_FAILURE_FILE)
+	@go test github.com/stmansour/simq/util && rm -f $(TEST_FAILURE_FILE)
 	@go test -coverprofile=coverage.out || (echo "*** ERROR ***  go test failed!" && exit 1)
 	@echo "*** ${THISDIR}: completed test ***"
 	@rm -f fail

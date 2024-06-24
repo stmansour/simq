@@ -120,8 +120,23 @@ func (qm *QueueManager) DeleteItem(SID int) error {
 
 // GetQueuedAndExecutingItems returns all items in the queue
 func (qm *QueueManager) GetQueuedAndExecutingItems() ([]QueueItem, error) {
-	querySQL := `SELECT SID, File, Name, Priority, Description, URL, State, DtEstimate, DtCompleted, Created, Modified
-				 FROM Queue WHERE (State >= 0 AND State <= 2) OR (State = 4)`
+	querySQL := `
+    SELECT SID, File, Name, Priority, Description, URL, State, DtEstimate, DtCompleted, Created, Modified
+    FROM Queue 
+    WHERE State IN (0, 1, 2)
+    ORDER BY 
+        CASE 
+            WHEN State = 2 AND DtEstimate IS NOT NULL THEN 1
+            WHEN State = 2 AND DtEstimate IS NULL THEN 2
+            ELSE 3
+        END,
+        CASE 
+            WHEN State = 2 AND DtEstimate IS NOT NULL THEN DtEstimate
+            WHEN State = 2 AND DtEstimate IS NULL THEN Created
+            ELSE Priority
+        END,
+        Created;
+    `
 	rows, err := qm.db.Query(querySQL)
 	if err != nil {
 		return nil, err

@@ -169,3 +169,46 @@ func TestEnsureSchemaExists(t *testing.T) {
 		t.Errorf("Failed to remove schema for testing: %v", err)
 	}
 }
+
+func TestGetActiveQueue(t *testing.T) {
+	qm, err := initTest(t)
+	if err != nil {
+		return
+	}
+
+	// Insert test items into the queue
+	items := []QueueItem{
+		{File: "file1", Name: "Simulation 1", Priority: 1, Description: "Test Simulation 1", URL: "http://localhost:8080", State: StateExecuting, DtEstimate: sql.NullTime{Time: time.Now().Add(10 * time.Hour), Valid: true}},
+		{File: "file2", Name: "Simulation 2", Priority: 3, Description: "Test Simulation 2", URL: "http://localhost:8080", State: StateExecuting, DtEstimate: sql.NullTime{Time: time.Now().Add(8 * time.Hour), Valid: true}},
+		{File: "file3", Name: "Simulation 3", Priority: 2, Description: "Test Simulation 3", URL: "http://localhost:8080", State: StateQueued},
+		{File: "file4", Name: "Simulation 4", Priority: 5, Description: "Test Simulation 4", URL: "http://localhost:8080", State: StateBooked},
+		{File: "file5", Name: "Simulation 5", Priority: 4, Description: "Test Simulation 5", URL: "http://localhost:8080", State: StateExecuting},
+		{File: "file6", Name: "Simulation 6", Priority: 1, Description: "Test Simulation 6", URL: "http://localhost:8080", State: StateQueued},
+		{File: "file7", Name: "Simulation 7", Priority: 2, Description: "Test Simulation 7", URL: "http://localhost:8080", State: StateBooked},
+		{File: "file8", Name: "Simulation 8", Priority: 3, Description: "Test Simulation 8", URL: "http://localhost:8080", State: StateExecuting, DtEstimate: sql.NullTime{Time: time.Now().Add(12 * time.Hour), Valid: true}},
+		{File: "file9", Name: "Simulation 9", Priority: 5, Description: "Test Simulation 9", URL: "http://localhost:8080", State: StateQueued},
+		{File: "file10", Name: "Simulation 10", Priority: 4, Description: "Test Simulation 10", URL: "http://localhost:8080", State: StateBooked},
+	}
+
+	for _, item := range items {
+		_, err := qm.InsertItem(item)
+		if err != nil {
+			t.Errorf("Failed to insert item: %v", err)
+			return
+		}
+	}
+
+	// Retrieve and verify the queue items
+	queueItems, err := qm.GetQueuedAndExecutingItems()
+	if err != nil {
+		t.Errorf("Failed to get queue items: %v", err)
+		return
+	}
+
+	expectedOrder := []int{2, 1, 8, 5, 6, 3, 7, 10, 4, 9}
+	for i, item := range queueItems {
+		if item.SID != expectedOrder[i] {
+			t.Errorf("Item order mismatch at position %d: got %d want %d", i, item.SID, expectedOrder[i])
+		}
+	}
+}

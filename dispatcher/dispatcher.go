@@ -35,6 +35,8 @@ func commandDispatcher(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch cmd.Command {
+	case "GetActiveQueue":
+		handleGetActiveQueue(w, cmd)
 	case "NewSimulation":
 		handleNewSimulation(w, cmd)
 	case "Shutdown":
@@ -81,4 +83,18 @@ func handleShutdown(w http.ResponseWriter, cmd Command) {
 		time.Sleep(1 * time.Second) // Give the response time to be sent
 		app.quit <- os.Interrupt    // Signal the quit channel to initiate shutdown
 	}()
+}
+
+// handleGetActiveQueue handles the GetActiveQueue command
+func handleGetActiveQueue(w http.ResponseWriter, cmd Command) {
+	items, err := app.qm.GetQueuedAndExecutingItems()
+	if err != nil {
+		http.Error(w, "Failed to get active queue items", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(items); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
 }
