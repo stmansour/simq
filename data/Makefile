@@ -7,6 +7,7 @@ data: *.go
 	go vet
 	@golint ./... | grep -v "use underscores in Go names;" | ( ! grep . )
 	staticcheck
+	golint
 	go build
 	go install
 	@echo "*** ${THISDIR}: completed ${THISDIR} ***"
@@ -19,8 +20,8 @@ clean:
 test: config
 	@touch $(TEST_FAILURE_FILE)
 	@if [ ! -f ./extres.json5 ]; then echo "*** WARNING *** No vault, skipping test"; else \
-	@go test github.com/stmansour/psim/${THISDIR} && rm -f $(TEST_FAILURE_FILE)	\
-	@go test -coverprofile=coverage.out || (echo "*** ERROR ***  go test failed!" && exit 1) \
+	go test github.com/stmansour/simq/${THISDIR} && rm -f $(TEST_FAILURE_FILE) ;	\
+	go test -coverprofile=coverage.out || (echo "*** ERROR ***  go test failed!" && exit 1) \
 	fi
 	@echo "*** ${THISDIR}: completed test ***"
 

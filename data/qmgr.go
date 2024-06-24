@@ -3,6 +3,22 @@ package data
 import (
 	"database/sql"
 	"time"
+
+	// Register the SQL driver
+	_ "github.com/go-sql-driver/mysql"
+)
+
+const (
+	// StateQueued indicates that the item is queued
+	StateQueued = 0
+	// StateBooked indicates that the item is booked for execution
+	StateBooked = 1
+	// StateExecuting indicates that the  item is currently executing
+	StateExecuting = 2
+	// StateCompleted indicates that the item has completed execution
+	StateCompleted = 3
+	// StateError indicates that there was an error with the item
+	StateError = 4
 )
 
 // QueueManager is a wrapper around the MySQL database
@@ -18,9 +34,9 @@ type QueueItem struct {
 	Priority    int
 	Description string
 	URL         string
-	Status      int
-	DtEstimate  time.Time
-	DtCompleted time.Time
+	State       int
+	DtEstimate  sql.NullTime
+	DtCompleted sql.NullTime
 	Created     time.Time
 	Modified    time.Time
 }
@@ -33,38 +49,52 @@ func NewQueueManager(dataSourceName string) (*QueueManager, error) {
 	}
 
 	manager := &QueueManager{db: db}
-	err = manager.ensureTableExists()
-	if err != nil {
-		return nil, err
-	}
 
 	return manager, nil
 }
 
-// ensureTableExists creates the Queue table if it does not exist
-func (qm *QueueManager) ensureTableExists() error {
-	createTableSQL := `CREATE TABLE IF NOT EXISTS Queue (
+func (qm *QueueManager) executeCmdList(cmds []string) error {
+	for _, cmd := range cmds {
+		_, err := qm.db.Exec(cmd)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+func (qm *QueueManager) removeSchemaForTesting() error {
+	stmts := []string{
+		"DROP TABLE IF EXISTS Queue;",
+	}
+	return qm.executeCmdList(stmts)
+
+}
+
+// ensureSchemaExists creates the Queue table if it does not exist
+func (qm *QueueManager) ensureSchemaExists() error {
+	cmds := []string{
+		`CREATE TABLE IF NOT EXISTS Queue (
 		SID INT AUTO_INCREMENT PRIMARY KEY,
 		File VARCHAR(80) NOT NULL,
 		Name VARCHAR(80) NOT NULL DEFAULT '',
 		Priority INT NOT NULL DEFAULT 5,
 		Description VARCHAR(256) NOT NULL DEFAULT '',
 		URL VARCHAR(80) NOT NULL,
-		Status INT NOT NULL DEFAULT 0,
+		State INT NOT NULL DEFAULT 0,
 		DtEstimate DATETIME,
 		DtCompleted DATETIME,
 		Created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		Modified TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-	);`
-	_, err := qm.db.Exec(createTableSQL)
-	return err
+	);`,
+	}
+	return qm.executeCmdList(cmds)
 }
 
 // InsertItem inserts an item into the queue
 func (qm *QueueManager) InsertItem(item QueueItem) (int64, error) {
-	insertSQL := `INSERT INTO Queue (File, Name, Priority, Description, URL, Status, DtEstimate, DtCompleted)
-				  VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-	result, err := qm.db.Exec(insertSQL, item.File, item.Name, item.Priority, item.Description, item.URL, item.Status, item.DtEstimate, item.DtCompleted)
+	insertSQL := `INSERT INTO Queue (File, Name, Priority, Description, URL, State, DtEstimate)
+				  VALUES (?, ?, ?, ?, ?, ?, ?)`
+	result, err := qm.db.Exec(insertSQL, item.File, item.Name, item.Priority, item.Description, item.URL, item.State, item.DtEstimate)
 	if err != nil {
 		return 0, err
 	}
@@ -73,16 +103,23 @@ func (qm *QueueManager) InsertItem(item QueueItem) (int64, error) {
 
 // UpdateItem updates an item in the queue
 func (qm *QueueManager) UpdateItem(item QueueItem) error {
-	updateSQL := `UPDATE Queue SET File = ?, Name = ?, Priority = ?, Description = ?, URL = ?, Status = ?, DtEstimate = ?, DtCompleted = ?, Modified = CURRENT_TIMESTAMP
+	updateSQL := `UPDATE Queue SET File = ?, Name = ?, Priority = ?, Description = ?, URL = ?, State = ?, DtEstimate = ?, DtCompleted = ?, Modified = CURRENT_TIMESTAMP
 				  WHERE SID = ?`
-	_, err := qm.db.Exec(updateSQL, item.File, item.Name, item.Priority, item.Description, item.URL, item.Status, item.DtEstimate, item.DtCompleted, item.SID)
+	_, err := qm.db.Exec(updateSQL, item.File, item.Name, item.Priority, item.Description, item.URL, item.State, item.DtEstimate, item.DtCompleted, item.SID)
+	return err
+}
+
+// DeleteItem deletes an item from the queue
+func (qm *QueueManager) DeleteItem(SID int) error {
+	deleteSQL := `DELETE FROM Queue WHERE SID = ?`
+	_, err := qm.db.Exec(deleteSQL, SID)
 	return err
 }
 
 // GetQueuedAndExecutingItems returns all items in the queue
 func (qm *QueueManager) GetQueuedAndExecutingItems() ([]QueueItem, error) {
-	querySQL := `SELECT SID, File, Name, Priority, Description, URL, Status, DtEstimate, DtCompleted, Created, Modified
-				 FROM Queue WHERE Status = 0 OR Status = 2`
+	querySQL := `SELECT SID, File, Name, Priority, Description, URL, State, DtEstimate, DtCompleted, Created, Modified
+				 FROM Queue WHERE (State >= 0 AND State <= 2) OR (State = 4)`
 	rows, err := qm.db.Query(querySQL)
 	if err != nil {
 		return nil, err
@@ -92,7 +129,7 @@ func (qm *QueueManager) GetQueuedAndExecutingItems() ([]QueueItem, error) {
 	var items []QueueItem
 	for rows.Next() {
 		var item QueueItem
-		err := rows.Scan(&item.SID, &item.File, &item.Name, &item.Priority, &item.Description, &item.URL, &item.Status, &item.DtEstimate, &item.DtCompleted, &item.Created, &item.Modified)
+		err := rows.Scan(&item.SID, &item.File, &item.Name, &item.Priority, &item.Description, &item.URL, &item.State, &item.DtEstimate, &item.DtCompleted, &item.Created, &item.Modified)
 		if err != nil {
 			return nil, err
 		}

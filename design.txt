@@ -58,7 +58,7 @@ For cloud based servers, we will pick a class of compute resource
 and adjust its capacity based on our experience.
 
 The simulator supports simtalk. It listens on an HTTP port and can
-be contacted while it is runniing simulations to provide status on
+be contacted while it is runniing simulations to provide State on
 how far along it is and how much longer it will take to complete.
 The scheduler will use this capability to keep track of all the
 active simulations going on, adjust their completion times, and
@@ -77,7 +77,7 @@ it has been booked for execution.
 As handlers become available, the scheduler will assign them
 simulations and provide them with the config file and other information
 needed. The scheduler periodically contacts every active simulator
-at its URL to update its status and completion time. When the
+at its URL to update its State and completion time. When the
 simulations are completed, the simulator sends back to the scheduler
 the reports it generated and they are saved under the Simulations
 Results Root in the filesystem under a folder for the date on which
