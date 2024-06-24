@@ -24,10 +24,10 @@ func initTest(t *testing.T) (*QueueManager, error) {
 		t.Errorf("Failed to initialize queue manager: %v", err)
 		return nil, err
 	}
-	if err := qm.removeSchemaForTesting(); err != nil {
+	if err := qm.RemoveSchemaForTesting(); err != nil {
 		return nil, err
 	}
-	if err := qm.ensureSchemaExists(); err != nil {
+	if err := qm.EnsureSchemaExists(); err != nil {
 		return nil, err
 	}
 	return qm, nil
@@ -134,7 +134,7 @@ func TestUpdateItem_NullDtEstimate(t *testing.T) {
 	}
 
 	// Drop the table after the test to avoid affecting subsequent tests
-	err = qm.removeSchemaForTesting()
+	err = qm.RemoveSchemaForTesting()
 	if err != nil {
 		t.Errorf("Failed to remove schema for testing: %v", err)
 	}
@@ -148,14 +148,14 @@ func TestEnsureSchemaExists(t *testing.T) {
 	}
 
 	// Drop the Queue table (if it exists) before testing
-	err = qm.removeSchemaForTesting()
+	err = qm.RemoveSchemaForTesting()
 	if err != nil {
 		t.Errorf("Failed to remove schema for testing: %v", err)
 		return
 	}
 
 	// Ensure the schema exists (should create the table)
-	err = qm.ensureSchemaExists()
+	err = qm.EnsureSchemaExists()
 	if err != nil {
 		t.Errorf("Failed to create schema: %v", err)
 		return
@@ -164,7 +164,7 @@ func TestEnsureSchemaExists(t *testing.T) {
 	// Optionally add additional checks to verify specific table structure elements
 
 	// Drop the table after the test to avoid affecting subsequent tests
-	err = qm.removeSchemaForTesting()
+	err = qm.RemoveSchemaForTesting()
 	if err != nil {
 		t.Errorf("Failed to remove schema for testing: %v", err)
 	}

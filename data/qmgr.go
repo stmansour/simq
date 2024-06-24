@@ -62,7 +62,9 @@ func (qm *QueueManager) executeCmdList(cmds []string) error {
 	}
 	return nil
 }
-func (qm *QueueManager) removeSchemaForTesting() error {
+
+// RemoveSchemaForTesting removes the Queue table
+func (qm *QueueManager) RemoveSchemaForTesting() error {
 	stmts := []string{
 		"DROP TABLE IF EXISTS Queue;",
 	}
@@ -70,8 +72,8 @@ func (qm *QueueManager) removeSchemaForTesting() error {
 
 }
 
-// ensureSchemaExists creates the Queue table if it does not exist
-func (qm *QueueManager) ensureSchemaExists() error {
+// EnsureSchemaExists creates the Queue table if it does not exist
+func (qm *QueueManager) EnsureSchemaExists() error {
 	cmds := []string{
 		`CREATE TABLE IF NOT EXISTS Queue (
 		SID INT AUTO_INCREMENT PRIMARY KEY,

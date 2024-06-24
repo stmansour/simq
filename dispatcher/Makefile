@@ -14,14 +14,16 @@ sim: *.go
 
 clean:
 	go clean
-	rm -rf *.prof 
+	rm -rf *.prof *.out extres.json5 fail
 	@echo "*** ${THISDIR}: completed clean ***"
 
-test:
+test: config
 	@touch $(TEST_FAILURE_FILE)
 	@go test -coverprofile=coverage.out -coverpkg=../../...
-	./functest.sh && rm -f ${TEST_FAILURE_FILE}
 	@echo "*** ${THISDIR}: completed test ***"
+
+config:
+	if [ ! -f ./extres.json5 ]; then cp ~/.vault/extres.json5 .;fi
 
 coverage:
 	go tool cover -html=coverage.out 
