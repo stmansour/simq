@@ -19,7 +19,8 @@ clean:
 
 test: config
 	@touch $(TEST_FAILURE_FILE)
-	@go test -coverprofile=coverage.out -coverpkg=../../...
+	# @go test -coverprofile=coverage.out -coverpkg=../../...
+	@go test -coverprofile=coverage.out -coverpkg=./
 	@echo "*** ${THISDIR}: completed test ***"
 
 config:

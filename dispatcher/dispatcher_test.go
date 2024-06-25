@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -80,9 +81,12 @@ func TestCommandDispatcher(t *testing.T) {
 	}
 
 	// Check the response body
-	expected := "Created queue item with SID 1" // Adjust this based on the actual SID
-	if rr.Body.String() != expected {
-		t.Errorf("handler returned unexpected body: got %v want %v", rr.Body.String(), expected)
+	var resp SvcStatus201
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Errorf("Failed to unmarshal response: %v", err)
+	}
+	if resp.Status != "success" || resp.ID != 1 {
+		t.Errorf("handler returned issues: status = %q want %q", resp.Status, "success")
 	}
 }
 
@@ -118,10 +122,12 @@ func TestHandleShutdown(t *testing.T) {
 		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
 	}
 
-	// Check the response body
-	expected := "Server is shutting down"
-	if rr.Body.String() != expected {
-		t.Errorf("handler returned unexpected body: got %v want %v", rr.Body.String(), expected)
+	var resp SvcStatus200
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Errorf("Failed to unmarshal response: %v", err)
+	}
+	if resp.Status != "success" {
+		t.Errorf("handler returned issues: status = %q want %q", resp.Status, "success")
 	}
 }
 
@@ -175,16 +181,158 @@ func TestHandleGetActiveQueue(t *testing.T) {
 		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
 	}
 
-	// Check the response body is what we expect.
-	expectedOrder := []int{2, 1, 8, 5, 6, 3, 7, 10, 4, 9}
-	var queueItems []data.QueueItem
-	if err := json.NewDecoder(rr.Body).Decode(&queueItems); err != nil {
-		t.Fatalf("Failed to decode response body: %v", err)
+	var resp struct {
+		Status string
+		Data   []data.QueueItem
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Errorf("Failed to unmarshal response: %v", err)
+	}
+	if resp.Status != "success" {
+		t.Errorf("handler returned issues: status = %q want %q", resp.Status, "success")
 	}
 
-	for i, item := range queueItems {
+	// Check the response body is what we expect.
+	expectedOrder := []int{2, 1, 8, 5, 6, 3, 7, 10, 4, 9}
+	for i, item := range resp.Data {
 		if item.SID != expectedOrder[i] {
 			t.Errorf("Item order mismatch at position %d: got %d want %d", i, item.SID, expectedOrder[i])
 		}
+	}
+}
+
+func mustMarshal(v interface{}) []byte {
+	data, err := json.Marshal(v)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to marshal data: %v", err))
+	}
+	return data
+}
+func TestHandleUpdateItem(t *testing.T) {
+	qm, err := initTest(t)
+	if err != nil {
+		return
+	}
+	app.qm = qm
+
+	// Insert a new item
+	newItem := data.QueueItem{
+		File:        "/path/to/simulation.tar.gz",
+		Name:        "Test Simulation",
+		Priority:    5,
+		Description: "A test simulation",
+		URL:         "http://localhost:8080",
+		State:       data.StateQueued,
+	}
+	sid, err := qm.InsertItem(newItem)
+	if err != nil {
+		t.Fatalf("Failed to insert item: %v", err)
+	}
+
+	// Create the update request
+	updateRequest := UpdateItemRequest{
+		SID:         int(sid),
+		Priority:    10,
+		Description: "Updated description",
+	}
+	updateCommand := Command{
+		Command:  "UpdateItem",
+		Username: "testuser",
+		Data:     json.RawMessage(mustMarshal(updateRequest)),
+	}
+
+	// Send the update command
+	reqBody, _ := json.Marshal(updateCommand)
+	req, err := http.NewRequest("POST", "/command", bytes.NewBuffer(reqBody))
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
+	rr := httptest.NewRecorder()
+	handler := http.HandlerFunc(commandDispatcher)
+	handler.ServeHTTP(rr, req)
+
+	// Check the response
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
+	}
+	var resp SvcStatus201
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Errorf("Failed to unmarshal response: %v", err)
+	}
+	if resp.Status != "success" || resp.ID != int(sid) {
+		t.Errorf("handler returned issues: status = %q, id = %d want %q, %d", resp.Status, resp.ID, "success", sid)
+	}
+
+	// Verify the item was updated
+	updatedItem, err := qm.GetItemByID(int(sid))
+	if err != nil {
+		t.Fatalf("Failed to get item: %v", err)
+	}
+	if updatedItem.Priority != updateRequest.Priority {
+		t.Errorf("Priority not updated: got %v want %v", updatedItem.Priority, updateRequest.Priority)
+	}
+	if updatedItem.Description != updateRequest.Description {
+		t.Errorf("Description not updated: got %v want %v", updatedItem.Description, updateRequest.Description)
+	}
+}
+
+func TestHandleDeleteItem(t *testing.T) {
+	qm, err := initTest(t)
+	if err != nil {
+		return
+	}
+	app.qm = qm
+
+	// Insert a new item
+	newItem := data.QueueItem{
+		File:        "/path/to/simulation.tar.gz",
+		Name:        "Test Simulation",
+		Priority:    5,
+		Description: "A test simulation",
+		URL:         "http://localhost:8080",
+		State:       data.StateQueued,
+	}
+	sid, err := qm.InsertItem(newItem)
+	if err != nil {
+		t.Fatalf("Failed to insert item: %v", err)
+	}
+
+	// Create the delete request
+	deleteRequest := DeleteItemRequest{
+		SID: int(sid),
+	}
+	deleteCommand := Command{
+		Command:  "DeleteItem",
+		Username: "testuser",
+		Data:     json.RawMessage(mustMarshal(deleteRequest)),
+	}
+
+	// Send the delete command
+	reqBody, _ := json.Marshal(deleteCommand)
+	req, err := http.NewRequest("POST", "/command", bytes.NewBuffer(reqBody))
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
+	rr := httptest.NewRecorder()
+	handler := http.HandlerFunc(commandDispatcher)
+	handler.ServeHTTP(rr, req)
+
+	// Check the response
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
+	}
+
+	var resp SvcStatus201
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Errorf("Failed to unmarshal response: %v", err)
+	}
+	if resp.Status != "success" || resp.ID != int(sid) {
+		t.Errorf("handler returned issues: status = %q, id = %d want %q, %d", resp.Status, resp.ID, "success", sid)
+	}
+
+	// Verify the item was deleted
+	_, err = qm.GetItemByID(int(sid))
+	if err == nil {
+		t.Errorf("Expected item to be deleted, but it still exists")
 	}
 }

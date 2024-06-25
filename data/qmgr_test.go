@@ -161,13 +161,6 @@ func TestEnsureSchemaExists(t *testing.T) {
 		return
 	}
 
-	// Optionally add additional checks to verify specific table structure elements
-
-	// Drop the table after the test to avoid affecting subsequent tests
-	err = qm.RemoveSchemaForTesting()
-	if err != nil {
-		t.Errorf("Failed to remove schema for testing: %v", err)
-	}
 }
 
 func TestGetActiveQueue(t *testing.T) {
@@ -210,5 +203,103 @@ func TestGetActiveQueue(t *testing.T) {
 		if item.SID != expectedOrder[i] {
 			t.Errorf("Item order mismatch at position %d: got %d want %d", i, item.SID, expectedOrder[i])
 		}
+	}
+}
+
+func TestGetItemByID(t *testing.T) {
+	qm, err := initTest(t)
+	if err != nil {
+		return
+	}
+
+	// Insert a new item
+	newItem := QueueItem{
+		File:        "/path/to/simulation.tar.gz",
+		Name:        "Test Simulation",
+		Priority:    5,
+		Description: "A test simulation",
+		URL:         "http://localhost:8080",
+		State:       StateQueued,
+		DtEstimate:  sql.NullTime{Time: time.Now().Add(24 * time.Hour), Valid: true},
+	}
+	sid, err := qm.InsertItem(newItem)
+	if err != nil {
+		t.Errorf("Failed to insert item: %v", err)
+		return
+	}
+
+	// Retrieve the item by SID
+	retrievedItem, err := qm.GetItemByID(int(sid))
+	if err != nil {
+		t.Errorf("Failed to retrieve item by ID: %v", err)
+		return
+	}
+
+	// Verify the retrieved item matches the inserted item
+	if retrievedItem.SID != int(sid) {
+		t.Errorf("Retrieved SID does not match: got %d want %d", retrievedItem.SID, int(sid))
+	}
+	if retrievedItem.File != newItem.File {
+		t.Errorf("Retrieved File does not match: got %s want %s", retrievedItem.File, newItem.File)
+	}
+	if retrievedItem.Name != newItem.Name {
+		t.Errorf("Retrieved Name does not match: got %s want %s", retrievedItem.Name, newItem.Name)
+	}
+	if retrievedItem.Priority != newItem.Priority {
+		t.Errorf("Retrieved Priority does not match: got %d want %d", retrievedItem.Priority, newItem.Priority)
+	}
+	if retrievedItem.Description != newItem.Description {
+		t.Errorf("Retrieved Description does not match: got %s want %s", retrievedItem.Description, newItem.Description)
+	}
+	if retrievedItem.URL != newItem.URL {
+		t.Errorf("Retrieved URL does not match: got %s want %s", retrievedItem.URL, newItem.URL)
+	}
+	if retrievedItem.State != newItem.State {
+		t.Errorf("Retrieved State does not match: got %d want %d", retrievedItem.State, newItem.State)
+	}
+	if !retrievedItem.DtEstimate.Valid || !newItem.DtEstimate.Valid || !timestampsClose(retrievedItem.DtEstimate.Time, newItem.DtEstimate.Time) {
+		t.Errorf("Retrieved DtEstimate does not match: got %v want %v", retrievedItem.DtEstimate, newItem.DtEstimate)
+	}
+}
+
+// timestampsClose checks if two timestamps are within 1 second of each other
+func timestampsClose(t1, t2 time.Time) bool {
+	return t1.Sub(t2) < time.Second && t2.Sub(t1) < time.Second
+}
+
+// TestDeleteItem tests the DeleteItem function
+func TestDeleteItem(t *testing.T) {
+	qm, err := initTest(t)
+	if err != nil {
+		return
+	}
+
+	// Insert a new item
+	newItem := QueueItem{
+		File:        "/path/to/simulation.tar.gz",
+		Name:        "Test Simulation",
+		Priority:    5,
+		Description: "A test simulation",
+		URL:         "http://localhost:8080",
+		State:       StateQueued,
+		DtEstimate:  sql.NullTime{Time: time.Now().Add(24 * time.Hour), Valid: true},
+	}
+	sid, err := qm.InsertItem(newItem)
+	if err != nil {
+		t.Errorf("Failed to insert item: %v", err)
+		return
+	}
+
+	// Delete the item
+	err = qm.DeleteItem(int(sid))
+	if err != nil {
+		t.Errorf("Failed to delete item: %v", err)
+		return
+	}
+
+	// Try to retrieve the deleted item
+	_, err = qm.GetItemByID(int(sid))
+	if err == nil {
+		t.Errorf("Expected error when retrieving deleted item, but got none")
 	}
 }

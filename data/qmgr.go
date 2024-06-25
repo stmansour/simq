@@ -50,6 +50,11 @@ func NewQueueManager(dataSourceName string) (*QueueManager, error) {
 
 	manager := &QueueManager{db: db}
 
+	err = manager.EnsureSchemaExists()
+	if err != nil {
+		return nil, err
+	}
+
 	return manager, nil
 }
 
@@ -90,6 +95,19 @@ func (qm *QueueManager) EnsureSchemaExists() error {
 	);`,
 	}
 	return qm.executeCmdList(cmds)
+}
+
+// GetItemByID retrieves a queue item by its SID
+func (qm *QueueManager) GetItemByID(SID int) (QueueItem, error) {
+	var item QueueItem
+	querySQL := `SELECT SID, File, Name, Priority, Description, URL, State, DtEstimate, DtCompleted, Created, Modified
+				 FROM Queue WHERE SID = ?`
+	row := qm.db.QueryRow(querySQL, SID)
+	err := row.Scan(&item.SID, &item.File, &item.Name, &item.Priority, &item.Description, &item.URL, &item.State, &item.DtEstimate, &item.DtCompleted, &item.Created, &item.Modified)
+	if err != nil {
+		return item, err
+	}
+	return item, nil
 }
 
 // InsertItem inserts an item into the queue
