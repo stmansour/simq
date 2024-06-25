@@ -13,7 +13,7 @@ sim: *.go
 
 clean:
 	go clean
-	rm -rf *.prof *.out extres.json5 fail
+	rm -rf *.prof *.out extres.json5 fail [a-z][0-9] DISPATCHER.log
 	@echo "*** ${THISDIR}: completed clean ***"
 
 test: config

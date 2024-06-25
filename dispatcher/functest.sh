@@ -160,19 +160,20 @@ if [[ "${SINGLETEST}${TFILES}" = "${TFILES}" || "${SINGLETEST}${TFILES}" = "${TF
     echo "DISPATCHER_RESPONSE: ${DISPATCHER_RESPONSE}"  >> ${RESFILE} 2>&1
     echo "Updated simulation with SID: ${SID}" >> ${RESFILE} 2>&1
 
-    # # Request the active queue
-    # QUEUE_RESPONSE=$(curl -s -X POST "${SERVER}"/command -d '{ "command": "GetActiveQueue", "username": "testuser" }' -H "Content-Type: application/json")  >> ${RESFILE} 2>&1
+    # Request the active queue
+    DISPATCHER_RESPONSE=$(curl -s -X POST "${SERVER}"/command -d '{ "command": "GetActiveQueue", "username": "testuser" }' -H "Content-Type: application/json")  >> ${RESFILE} 2>&1
+    echo "DISPATCHER_RESPONSE: ${DISPATCHER_RESPONSE}"  >> ${RESFILE} 2>&1
 
-    # echo "Active Queue:"  >> ${RESFILE} 2>&1
-    # echo "${QUEUE_RESPONSE}" | jq  >> ${RESFILE} 2>&1
+    echo "Active Queue:"  >> ${RESFILE} 2>&1
+    echo "${DISPATCHER_RESPONSE}" | jq  >> ${RESFILE} 2>&1
 
-    # # Delete the simulation
-    # curl -s -X POST "${SERVER}"/command -d '{ "command": "DeleteItem", "username": "testuser", "data": { "sid": '"${SID}"' } }' -H "Content-Type: application/json"  >> ${RESFILE} 2>&1
-    # echo "Deleted simulation with SID: ${SID}"  >> ${RESFILE} 2>&1
+    # Delete the simulation
+    DISPATCHER_RESPONSE=$(curl -s -X POST "${SERVER}"/command -d '{ "command": "DeleteItem", "username": "testuser", "data": { "sid": '"${SID}"' } }' -H "Content-Type: application/json")  >> ${RESFILE} 2>&1
+    echo "DISPATCHER_RESPONSE: ${DISPATCHER_RESPONSE}"  >> ${RESFILE} 2>&1
 
-    # # Shutdown the server
-    # SHUTDOWN_REPONSE=$(curl -s -X POST -H "Content-Type: application/json" -d '{"command": "Shutdown", "username": "test_user"}' "${server}"_url)  >> ${RESFILE} 2>&1
-    # echo "Shutdown Response: ${SHUTDOWN_REPONSE}"  >> ${RESFILE} 2>&1
+    # Shutdown the server
+    DISPATCHER_RESPONSE=$(curl -s -X POST -H "Content-Type: application/json" -d '{"command": "Shutdown", "username": "test_user"}' "${server}"_url)  >> ${RESFILE} 2>&1
+    echo "DISPATCHER_RESPONSE: ${DISPATCHER_RESPONSE}"  >> ${RESFILE} 2>&1
 
     #compareToGold ${RESFILE}
     ((TESTCOUNT++))
