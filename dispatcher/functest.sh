@@ -3,6 +3,11 @@ RUNSINGLETEST=0
 TESTCOUNT=0
 ERRORCOUNT=0
 
+MYSQL=/usr/bin/mysql
+if [ ! -f ${MYSQL} ]; then
+    MYSQL=/usr/local/bin/mysql
+fi
+
 usage() {
     cat <<EOF
 
@@ -150,7 +155,7 @@ if [[ "${SINGLETEST}${TFILES}" = "${TFILES}" || "${SINGLETEST}${TFILES}" = "${TF
     #-------------------------------------------------------
     # start a new dispatcher with a clean database table
     #-------------------------------------------------------
-    echo "DROP TABLE IF EXISTS Queue;" | /usr/local/mysql/bin/mysql simq
+    echo "DROP TABLE IF EXISTS Queue;" | ${MYSQL} simq
     ./dispatcher >DISPATCHER.log 2>&1 &
     DISPATCHER_PID=$!
     echo "Started dispatcher with PID: ${DISPATCHER_PID}" >> ${RESFILE}
