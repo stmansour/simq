@@ -2,7 +2,6 @@ TOP=../..
 BINDIR=${TOP}/dist/simq
 THISDIR="dispatcher"
 TEST_FAILURE_FILE=fail
-THISDIR := $(notdir $(PWD))
 BUILD_TIME := $(shell date "+%Y-%m-%d_%H:%M:%S")
 
 sim: *.go
@@ -19,6 +18,7 @@ clean:
 
 test: config
 	@touch $(TEST_FAILURE_FILE)
+	go test github.com/stmansour/simq/${THISDIR} && rm -f $(TEST_FAILURE_FILE) ;	\
 	# @go test -coverprofile=coverage.out -coverpkg=../../...
 	@go test -coverprofile=coverage.out -coverpkg=./
 	@echo "*** ${THISDIR}: completed test ***"
