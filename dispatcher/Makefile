@@ -1,25 +1,25 @@
-TOP=../..
+TOP=..
 BINDIR=${TOP}/dist/simq
 THISDIR="dispatcher"
 TEST_FAILURE_FILE=fail
 BUILD_TIME := $(shell date "+%Y-%m-%d_%H:%M:%S")
 
-sim: *.go
+dispatcher: *.go
 	go vet
 	golint
 	staticcheck
-	go build -ldflags "-X 'github.com/stmansour/psim/util.buildID=$(BUILD_TIME)'" -o dispatcher
+	go build -ldflags "-X 'github.com/stmansour/simq/util.buildID=$(BUILD_TIME)'" -o dispatcher
 	@echo "*** $(THISDIR): completed $(THISDIR) ***"
 
 clean:
 	go clean
-	rm -rf *.prof *.out extres.json5 fail [a-z][0-9] DISPATCHER.log
+	rm -rf *.prof *.out extres.json5 fail [a-z][0-9] DISPATCHER.log serverresponse
 	@echo "*** ${THISDIR}: completed clean ***"
 
 test: config
 	@touch $(TEST_FAILURE_FILE)
-	go test github.com/stmansour/simq/${THISDIR} && rm -f $(TEST_FAILURE_FILE) ;	\
-	# @go test -coverprofile=coverage.out -coverpkg=../../...
+	@go test github.com/stmansour/simq/${THISDIR}
+	@./functest.sh && rm -f $(TEST_FAILURE_FILE) 
 	@go test -coverprofile=coverage.out -coverpkg=./
 	@echo "*** ${THISDIR}: completed test ***"
 
@@ -30,6 +30,7 @@ coverage:
 	go tool cover -html=coverage.out 
 
 package:
+	cp dispatcher ${BINDIR}/
 	@echo "*** ${THISDIR}: completed package ***"
 
 releaseman:

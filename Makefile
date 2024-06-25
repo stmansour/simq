@@ -54,14 +54,14 @@ check_tests:
 		fi
 
 package:
+	mkdir -p dist/simq/man/man1
 	for dir in $(DIRS); do make -C $$dir package;done
-	if [ -d /usr/local/simq/bin/data ]; then cd dist/simq ; rm -rf data ; cp -r /usr/local/simq/bin/data . ; fi
 	cd dist ; rm -f simq.tar* ; tar cvf simq.tar simq ; gzip simq.tar
 
-all: starttimer clean dispatcher package test stoptimer
+all: starttimer clean doit package test stoptimer
 	@echo "Completed"
 
-build: starttimer clean psim package stoptimer
+build: starttimer clean doit package stoptimer
 
 stats:
 	@find . -name "*.go" | srcstats

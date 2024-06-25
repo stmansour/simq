@@ -1,0 +1,42 @@
+Result File: a0
+Started dispatcher with PROCESSID_PLACEHOLDER
+Sending NewSimulation command: { "command": "NewSimulation", "username": "test-user", "data": { "file": "path/to/simulation.tar.gz", "name": "Test Simulation", "priority": 5, "description": "A test simulation", "url": "http://localhost:8080" } }
+{
+  "status": "success",
+  "message": "Created queue item",
+  "id": 1
+}
+Sending GetActiveQueue command: { "command": "GetActiveQueue", "username": "test-user" }
+{
+  "Status": "success",
+  "Data": [
+    {
+      "SID": 1,
+      "File": "placeholder",
+      "Name": "Test Simulation",
+      "Priority": 5,
+      "Description": "A test simulation",
+      "URL": "http://localhost:8080",
+      "State": 0,
+      "DtEstimate": {
+        "Time": "0001-01-01T00:00:00Z",
+        "Valid": false
+      },
+      "DtCompleted": {
+        "Time": "0001-01-01T00:00:00Z",
+        "Valid": false
+      },
+      "CREATED_PLACEHOLDER
+      "MODIFIED_PLACEHOLDER
+    }
+  ]
+}
+Sending DeleteItem command: { "command": "DeleteItem", "username": "test-user", "data": { "sid": 1 } }
+{
+  "status": "success",
+  "message": "deleted",
+  "id": 1
+}
+Shutting down the server with command: { "command": "Shutdown", "username": "test-user" }
+Shutdown Response: {"status":"success","message":"Shutting down"}
+Dispatcher has shut down successfully

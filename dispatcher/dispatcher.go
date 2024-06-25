@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"os"
 	"time"
@@ -61,7 +62,10 @@ func commandDispatcher(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Printf("\tcommand: %s", cmd.Command)
+
 	if h, ok = handlerTable[cmd.Command]; !ok {
+		log.Printf("\tUnknown command: %s", cmd.Command)
 		http.Error(w, "Unknown command", http.StatusBadRequest)
 	}
 
@@ -104,6 +108,7 @@ func handleNewSimulation(w http.ResponseWriter, r *http.Request, cmd *Command) {
 
 // handleShutdown handles the Shutdown command
 func handleShutdown(w http.ResponseWriter, r *http.Request, cmd *Command) {
+	log.Println("Shutdown command received")
 	resp := SvcStatus200{
 		Status:  "success",
 		Message: "Shutting down",

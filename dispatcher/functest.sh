@@ -1,9 +1,7 @@
 #!/bin/bash
-
 RUNSINGLETEST=0
 TESTCOUNT=0
 ERRORCOUNT=0
-ARCHIVE=arch
 
 usage() {
     cat <<EOF
@@ -30,6 +28,17 @@ OPTIONS
 EOF
 }
 
+# Function to send command and log response
+#------------------------------------------------------------------------------
+send_command() {
+    local CMD=$1
+    local DESCRIPTION=$2
+    echo "Sending ${DESCRIPTION} command: ${CMD}" >> ${RESFILE}
+    local RESPONSE=$(curl -s -X POST http://localhost:8250/command -d "${CMD}" -H "Content-Type: application/json")
+    echo "Response: ${RESPONSE}" >> serverresponse
+    echo "${RESPONSE}" | jq . >> ${RESFILE}
+}
+
 #------------------------------------------------------------------------------
 # Function to compare a report file to its gold standard
 # INPUTS
@@ -49,8 +58,9 @@ compareToGold() {
 
     # Normalize the report file
     sed -E \
-        -e 's/^Version:.*/Version: VERSION_PLACEHOLDER/' \
-        -e 's/^Available cores:.*/Version: PLACEHOLDER/' \
+        -e 's/Created":.*/CREATED_PLACEHOLDER/' \
+        -e 's/Modified":.*/MODIFIED_PLACEHOLDER/' \
+        -e 's/dispatcher with PID:.*/dispatcher with PROCESSID_PLACEHOLDER/' \
         -e 's/Current Time:.*/Current Time: TIME_PLACEHOLDER/' \
         -e 's/Random number seed:[[:space:]]+[0-9]+/Random number seed: SEED_PLACEHOLDER/' \
         -e 's/Archive directory:.*/Archive directory: PLACEHOLDER/' \
@@ -123,6 +133,8 @@ done
 shift $((OPTIND - 1))
 ############################################################################################
 
+killall dispatcher      # precaution
+
 #------------------------------------------------------------------------------
 #  TEST a
 #  initial dispatcher test
@@ -130,64 +142,73 @@ shift $((OPTIND - 1))
 TFILES="a"
 STEP=0
 if [[ "${SINGLETEST}${TFILES}" = "${TFILES}" || "${SINGLETEST}${TFILES}" = "${TFILES}${TFILES}" ]]; then
-    echo -n "Test ${TFILES} - "
-    echo -n "Basic dispatcher test... "
+    echo -n "Test ${TFILES} - Basic dispatcher test... "
+
     RESFILE="${TFILES}${STEP}"
-    echo "BASIC dispatcher test..." > ${RESFILE}
+    echo "Result File: ${RESFILE}" > ${RESFILE}
 
     #-------------------------------------------------------
     # start a new dispatcher with a clean database table
     #-------------------------------------------------------
     echo "DROP TABLE IF EXISTS Queue;" | /usr/local/mysql/bin/mysql simq
-    killall dispatcher
-    SERVER="http://localhost:8250"
     ./dispatcher >DISPATCHER.log 2>&1 &
-    pgrep dispatcher >> ${RESFILE} 2>&1
-    sleep 1 # Wait for the server to start
+    DISPATCHER_PID=$!
+    echo "Started dispatcher with PID: ${DISPATCHER_PID}" >> ${RESFILE}
+    sleep 2
 
-    #-------------------------------------------------------
-    # TEST COMMAND - NewSimulation
-    #-------------------------------------------------------
-    DISPATCHER_RESPONSE=$(curl -s -X POST "${SERVER}"/command -d '{ "command": "NewSimulation", "username": "testuser",
-        "data": { "file": "/path/to/simulation.tar.gz", "name": "Test Simulation", "priority": 5, "description": "A test simulation", "url": "http://localhost:8080" }
-        }' -H "Content-Type: application/json") >> ${RESFILE} 2>&1
-    echo "DISPATCHER_RESPONSE: ${DISPATCHER_RESPONSE}"  >> ${RESFILE} 2>&1
-    SID=$(echo "${DISPATCHER_RESPONSE}" | grep -o '[0-9]\+')  >> ${RESFILE} 2>&1
-    echo "Added simulation with SID: ${SID}"  >> ${RESFILE} 2>&1
+    #----------------------------------
+    # Check if dispatcher is running
+    #----------------------------------
+    if ! ps -p ${DISPATCHER_PID} > /dev/null; then
+        echo "Dispatcher failed to start"
+        exit 1
+    fi
 
-    # Update the simulation
-    DISPATCHER_RESPONSE=$(curl -s -X POST "${SERVER}"/command -d '{ "command": "UpdateItem", "username": "testuser", "data": {"sid": '"${SID}"', "priority": 10, "description": "Updated description"} }' -H "Content-Type: application/json")  >> ${RESFILE} 2>&1
-    echo "DISPATCHER_RESPONSE: ${DISPATCHER_RESPONSE}"  >> ${RESFILE} 2>&1
-    echo "Updated simulation with SID: ${SID}" >> ${RESFILE} 2>&1
+    #----------------------------------
+    # Send commands to the dispatcher
+    #----------------------------------
+    # Add a new simulation
+    ADD_CMD='{ "command": "NewSimulation", "username": "test-user", "data": { "file": "path/to/simulation.tar.gz", "name": "Test Simulation", "priority": 5, "description": "A test simulation", "url": "http://localhost:8080" } }'
+    send_command "${ADD_CMD}" "NewSimulation"
+    sleep 1
 
-    # Request the active queue
-    DISPATCHER_RESPONSE=$(curl -s -X POST "${SERVER}"/command -d '{ "command": "GetActiveQueue", "username": "testuser" }' -H "Content-Type: application/json")  >> ${RESFILE} 2>&1
-    echo "DISPATCHER_RESPONSE: ${DISPATCHER_RESPONSE}"  >> ${RESFILE} 2>&1
-
-    echo "Active Queue:"  >> ${RESFILE} 2>&1
-    echo "${DISPATCHER_RESPONSE}" | jq  >> ${RESFILE} 2>&1
-
+    #----------------------------------
+    # Get the active queue
+    #----------------------------------
+    GET_QUEUE_CMD='{ "command": "GetActiveQueue", "username": "test-user" }'
+    send_command "${GET_QUEUE_CMD}" "GetActiveQueue"
+    sleep 1
+    #----------------------------------
     # Delete the simulation
-    DISPATCHER_RESPONSE=$(curl -s -X POST "${SERVER}"/command -d '{ "command": "DeleteItem", "username": "testuser", "data": { "sid": '"${SID}"' } }' -H "Content-Type: application/json")  >> ${RESFILE} 2>&1
-    echo "DISPATCHER_RESPONSE: ${DISPATCHER_RESPONSE}"  >> ${RESFILE} 2>&1
+    #---------------------------------- 
+    DELETE_CMD='{ "command": "DeleteItem", "username": "test-user", "data": { "sid": 1 } }'
+    send_command "${DELETE_CMD}" "DeleteItem"
+    sleep 1
 
+    #----------------------------------
     # Shutdown the server
-    DISPATCHER_RESPONSE=$(curl -s -X POST -H "Content-Type: application/json" -d '{"command": "Shutdown", "username": "test_user"}' "${server}"_url)  >> ${RESFILE} 2>&1
-    echo "DISPATCHER_RESPONSE: ${DISPATCHER_RESPONSE}"  >> ${RESFILE} 2>&1
+    #----------------------------------
+    SHUTDOWN_CMD='{ "command": "Shutdown", "username": "test-user" }'
+    echo "Shutting down the server with command: ${SHUTDOWN_CMD}"  >> ${RESFILE}
+    SHUTDOWN_RESPONSE=$(curl -s -X POST -H "Content-Type: application/json" -d "${SHUTDOWN_CMD}" http://localhost:8250/command)
+    echo "Shutdown Response: ${SHUTDOWN_RESPONSE}" >> ${RESFILE}
 
-    #compareToGold ${RESFILE}
+    #---------------------------------------
+    # Wait for the dispatcher to shutdown
+    #---------------------------------------
+    sleep 2
+    if ps -p ${DISPATCHER_PID} > /dev/null; then
+        echo "Dispatcher still running after shutdown command" >> ${RESFILE}
+    else
+        echo "Dispatcher has shut down successfully" >> ${RESFILE}
+    fi
+    compareToGold ${RESFILE}
     ((TESTCOUNT++))
 fi
-
-#------------------------------------------------------------------------------
-#  TEST b
-#  test linguistic influencer
-#------------------------------------------------------------------------------
-TFILES="b"
-STEP=0
 
 echo "Total tests: ${TESTCOUNT}"
 echo "Total errors: ${ERRORCOUNT}"
 if [ "${ERRORCOUNT}" -gt 0 ]; then
     exit 2
 fi
+
