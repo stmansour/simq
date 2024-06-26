@@ -1,5 +1,5 @@
 # test comment
-DIRS=util data dispatcher
+DIRS=util data dispatcher psq
 DIST=dist 
 TEST_FAILURE_FILE=fail
 # Temporary file for storing start time
