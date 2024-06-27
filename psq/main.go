@@ -2,12 +2,8 @@ package main
 
 import (
 	"bufio"
-	"bytes"
-	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"os/user"
 	"strconv"
@@ -104,26 +100,4 @@ func interactiveMode(username string) {
 			fmt.Println("Unknown command. Type 'help' for a list of commands.")
 		}
 	}
-}
-
-func sendRequest(cmd Command) []byte {
-	cmdBytes, _ := json.Marshal(cmd)
-	resp, err := http.Post(defaultURL, "application/json", bytes.NewBuffer(cmdBytes))
-	if err != nil {
-		fmt.Printf("Error sending request: %v\n", err)
-		return nil
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		fmt.Printf("Received non-OK HTTP status: %s\n", resp.Status)
-		return nil
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		fmt.Printf("Error reading response: %v\n", err)
-		return nil
-	}
-	return body
 }

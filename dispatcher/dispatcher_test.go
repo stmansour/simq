@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"database/sql"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"mime/multipart"
@@ -53,11 +52,7 @@ func TestHandleNewSimulation(t *testing.T) {
 		t.Fatalf("Failed to read config file: %v", err)
 	}
 
-	// Encode the file content as base64
-	encodedContent := base64.StdEncoding.EncodeToString(fileContent)
-
 	createReq := CreateQueueEntryRequest{
-		FileContent:      encodedContent,
 		OriginalFilename: "config.json5",
 		Name:             "Test Simulation",
 		Priority:         5,

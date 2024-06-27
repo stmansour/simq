@@ -229,7 +229,7 @@ if [[ "${SINGLETEST}${TFILES}" = "${TFILES}" || "${SINGLETEST}${TFILES}" = "${TF
     #----------------------------------
     # Create a new simulation
     #----------------------------------
-    ADD_CMD='{"name":"Test Simulation","priority":5,"description":"A test simulation","url":"http://localhost:8080","original_filename":"config.json5"}'
+    ADD_CMD='{"name":"Test Simulation","priority":5,"description":"A test simulation","url":"http://localhost:8080","OriginalFilename":"config.json5"}'
     send_command_with_file "NewSimulation" "${ADD_CMD}" "config.json5"
     sleep 1
 

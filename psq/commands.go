@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/stmansour/simq/data"
 	"github.com/yosuke-furukawa/json5/encoding/json5"
@@ -18,10 +19,12 @@ type Command struct {
 
 // CreateQueueEntryRequest represents the data for creating a queue entry
 type CreateQueueEntryRequest struct {
-	File     string `json:"file"`
-	Name     string `json:"name"`
-	Priority int    `json:"priority"`
-	URL      string `json:"url"`
+	FileContent      string `json:"FileContent"`
+	OriginalFilename string `json:"OriginalFilename"`
+	Name             string `json:"name"`
+	Priority         int    `json:"priority"`
+	Description      string `json:"description"`
+	URL              string `json:"url"`
 }
 
 // Config represents the structure of a config
@@ -44,10 +47,11 @@ func addJob(username, file string) {
 	}
 
 	data := CreateQueueEntryRequest{
-		File:     file,
-		Name:     config.SimulationName,
-		Priority: defaultPriority,
-		URL:      defaultURL,
+		OriginalFilename: filepath.Base(file),
+		Name:             config.SimulationName,
+		Priority:         defaultPriority,
+		Description:      "",
+		URL:              defaultURL,
 	}
 
 	dataBytes, _ := json.Marshal(data)
@@ -57,7 +61,7 @@ func addJob(username, file string) {
 		Data:     json.RawMessage(dataBytes),
 	}
 
-	resp := sendRequest(cmd)
+	resp := sendMultipartRequest(cmd, file)
 	if resp != nil {
 		fmt.Printf("Add Job Response: %s\n", string(resp))
 	}

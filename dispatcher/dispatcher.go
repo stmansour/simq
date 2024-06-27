@@ -27,7 +27,7 @@ type CreateQueueEntryRequest struct {
 	Priority         int    `json:"priority"`
 	Description      string `json:"description"`
 	URL              string `json:"url"`
-	OriginalFilename string `json:"original_filename"`
+	OriginalFilename string `json:"OriginalFilename"`
 }
 
 // UpdateItemRequest represents the data for updating a queue item
@@ -99,23 +99,42 @@ func commandDispatcher(w http.ResponseWriter, r *http.Request) {
 // handleNewSimulation handles the NewSimulation command
 // It creates a new entry in the queue
 // ---------------------------------------------------------------------------
-// handleNewSimulation handles the NewSimulation command
 func handleNewSimulation(w http.ResponseWriter, r *http.Request, cmd *Command) {
+	// Parse the multipart form data
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		log.Printf("Failed to parse multipart form: %v", err)
+		http.Error(w, "Failed to parse multipart form", http.StatusBadRequest)
+		return
+	}
+
+	// Get the command data part
+	dataPart := r.FormValue("data")
+	if dataPart == "" {
+		http.Error(w, "Missing command data part", http.StatusBadRequest)
+		return
+	}
+
+	// Unmarshal the command data into CreateQueueEntryRequest
 	var req CreateQueueEntryRequest
-	err := json.Unmarshal(cmd.Data, &req)
-	if err != nil {
+	if err := json.Unmarshal([]byte(dataPart), &req); err != nil {
 		http.Error(w, "Failed to unmarshal request data", http.StatusBadRequest)
 		return
 	}
 
-	// Retrieve the file from the form
+	// Get the file from the form
 	file, _, err := r.FormFile("file")
 	if err != nil {
-		log.Printf("Failed to get file from form: %v", err)
 		http.Error(w, "Failed to get file from form", http.StatusBadRequest)
 		return
 	}
 	defer file.Close()
+
+	// Read the file content
+	fileContent, err := io.ReadAll(file)
+	if err != nil {
+		http.Error(w, "Failed to read file content", http.StatusInternalServerError)
+		return
+	}
 
 	// Create the directory if it doesn't exist
 	err = os.MkdirAll("qdconfigs", os.ModePerm)
@@ -134,9 +153,8 @@ func handleNewSimulation(w http.ResponseWriter, r *http.Request, cmd *Command) {
 	}
 	defer tempFile.Close()
 
-	// Write the file content to the temporary file
-	_, err = io.Copy(tempFile, file)
-	if err != nil {
+	// Write the file content to the temp file
+	if _, err := tempFile.Write(fileContent); err != nil {
 		log.Printf("Failed to write file content: %v", err)
 		http.Error(w, "Failed to write file content", http.StatusInternalServerError)
 		return
@@ -159,15 +177,15 @@ func handleNewSimulation(w http.ResponseWriter, r *http.Request, cmd *Command) {
 		return
 	}
 
-	// Create the new directory for the simulation using the SID
+	// Make the new directory
 	err = os.MkdirAll(fmt.Sprintf("qdconfigs/%d", sid), os.ModePerm)
 	if err != nil {
-		log.Printf("Failed to create directory qdconfigs/%d: %v", sid, err)
+		log.Printf("Failed to make directory qdconfigs/%d: %v", sid, err)
 		http.Error(w, "Failed to create directory", http.StatusInternalServerError)
 		return
 	}
 
-	// Rename the file to include the original filename
+	// Rename the file to include the queue item ID and original filename
 	newFilePath := fmt.Sprintf("qdconfigs/%d/%s", sid, req.OriginalFilename)
 	if err := os.Rename(tempFile.Name(), newFilePath); err != nil {
 		log.Printf("Failed to rename %s to %s: %v", tempFile.Name(), newFilePath, err)
