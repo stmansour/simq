@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -56,33 +57,53 @@ func TestHandleNewSimulation(t *testing.T) {
 	encodedContent := base64.StdEncoding.EncodeToString(fileContent)
 
 	createReq := CreateQueueEntryRequest{
-		FileContent: encodedContent,
-		Name:        "Test Simulation",
-		Priority:    5,
-		Description: "A test simulation",
-		URL:         "http://localhost:8080",
+		FileContent:      encodedContent,
+		OriginalFilename: "config.json5",
+		Name:             "Test Simulation",
+		Priority:         5,
+		Description:      "A test simulation",
+		URL:              "http://localhost:8080",
 	}
 	reqData, err := json.Marshal(createReq)
 	if err != nil {
 		t.Fatalf("Failed to marshal create request: %v", err)
 	}
 
-	cmd := Command{
-		Command:  "NewSimulation",
-		Username: "test-user",
-		Data:     reqData,
-	}
-	cmdData, err := json.Marshal(cmd)
-	if err != nil {
-		t.Fatalf("Failed to marshal command: %v", err)
+	// Create a new multipart form request
+	var b bytes.Buffer
+	w := multipart.NewWriter(&b)
+
+	// Add the command field
+	if err := w.WriteField("command", "NewSimulation"); err != nil {
+		t.Fatalf("Failed to write command field: %v", err)
 	}
 
-	// Create a new HTTP request
-	req, err := http.NewRequest("POST", "/command", bytes.NewBuffer(cmdData))
+	// Add the username field
+	if err := w.WriteField("username", "test-user"); err != nil {
+		t.Fatalf("Failed to write username field: %v", err)
+	}
+
+	// Add the data field
+	if err := w.WriteField("data", string(reqData)); err != nil {
+		t.Fatalf("Failed to write data field: %v", err)
+	}
+
+	// Add the file field
+	fw, err := w.CreateFormFile("file", "config.json5")
+	if err != nil {
+		t.Fatalf("Failed to create form file: %v", err)
+	}
+	if _, err := fw.Write(fileContent); err != nil {
+		t.Fatalf("Failed to write file content: %v", err)
+	}
+	w.Close()
+
+	// Create a new HTTP request with the multipart form data
+	req, err := http.NewRequest("POST", "/command", &b)
 	if err != nil {
 		t.Fatalf("Failed to create request: %v", err)
 	}
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", w.FormDataContentType())
 
 	// Create a ResponseRecorder to record the response
 	rr := httptest.NewRecorder()

@@ -2,6 +2,7 @@
 RUNSINGLETEST=0
 TESTCOUNT=0
 ERRORCOUNT=0
+DISPATCHER_RUNNING=0
 
 MYSQL=/usr/bin/mysql
 if [ ! -f ${MYSQL} ]; then
@@ -34,6 +35,34 @@ OPTIONS
 EOF
 }
 
+#############################################################################
+# pause()
+#   Description:
+#		Ask the user how to proceed.
+#
+#   Params:
+#       none
+#############################################################################
+pause() {
+	read -p "Press [Enter] to continue, M to move ${2} to gold/${2}.gold, Q or X to quit..." x
+	x=$(echo "${x}" | tr "[:upper:]" "[:lower:]")
+	if [ "${x}" == "q" -o "${x}" == "x" ]; then
+		if [ ${MANAGESERVER} -eq 1 ]; then
+			echo "STOPPING DISPATCHER"
+			pkill dispatcher
+		fi
+		exit 0
+    fi
+}
+
+
+# Function to check if a string is valid JSON
+#------------------------------------------------------------------------------
+is_json() {
+    echo "$1" | jq empty > /dev/null 2>&1
+    return $?
+}
+
 # Function to send command and log response
 #------------------------------------------------------------------------------
 send_command() {
@@ -42,8 +71,29 @@ send_command() {
     echo "Sending ${DESCRIPTION} command: curl -s -X POST http://localhost:8250/command -d \"${CMD}\" -H \"Content-Type: application/json\"" >> ${RESFILE}
     local RESPONSE=$(curl -s -X POST http://localhost:8250/command -d "${CMD}" -H "Content-Type: application/json")
     echo "Response: ${RESPONSE}" >> serverresponse
-    echo "${RESPONSE}" | jq . >> ${RESFILE}
+    if is_json "${RESPONSE}"; then
+        echo "${RESPONSE}" | jq . >> ${RESFILE}
+    else
+        echo "${RESPONSE}" >> ${RESFILE}
+    fi
 }
+
+# Function to send command with file and log response
+#------------------------------------------------------------------------------
+send_command_with_file() {
+    local DESCRIPTION=$1
+    local CMD=$2
+    local FILE=$3
+    echo "Sending ${DESCRIPTION} command with file: curl -s -X POST http://localhost:8250/command -F \"command=NewSimulation\" -F \"username=test-user\" -F \"data=${CMD}\" -F \"file=@${FILE}\"" >> ${RESFILE}
+    local RESPONSE=$(curl -s -X POST http://localhost:8250/command -F "command=NewSimulation" -F "username=test-user" -F "data=${CMD}" -F "file=@${FILE}")
+    echo "Response: ${RESPONSE}" >> serverresponse
+    if is_json "${RESPONSE}"; then
+        echo "${RESPONSE}" | jq . >> ${RESFILE}
+    else
+        echo "${RESPONSE}" >> ${RESFILE}
+    fi
+}
+
 
 #------------------------------------------------------------------------------
 # Function to compare a report file to its gold standard
@@ -117,6 +167,29 @@ compareToGold() {
     fi
 }
 
+#------------------------------------------------------------------------------
+# startDispatcher - kill any existing dispatcher, then start the dispatcher.
+# INPUTS
+#    none yet
+#------------------------------------------------------------------------------
+startDispatcher() {
+    if ((DISPATCHER_RUNNING == 0)); then
+        killall -9 dispatcher
+
+        #-------------------------------------------------------
+        # start a new dispatcher with a clean database table
+        #-------------------------------------------------------
+        echo "DROP TABLE IF EXISTS Queue;" | ${MYSQL} simq
+        rm -rf qdconfigs
+
+        ./dispatcher >DISPATCHER.log 2>&1 &
+        DISPATCHER_PID=$!
+        echo "Started dispatcher with PID: ${DISPATCHER_PID}"
+        sleep 2
+        DISPATCHER_RUNNING=1
+    fi
+}
+
 ###############################################################################
 #    INPUT
 ###############################################################################
@@ -147,34 +220,17 @@ shift $((OPTIND - 1))
 TFILES="a"
 STEP=0
 if [[ "${SINGLETEST}${TFILES}" = "${TFILES}" || "${SINGLETEST}${TFILES}" = "${TFILES}${TFILES}" ]]; then
+    startDispatcher
     echo -n "Test ${TFILES} - Basic dispatcher test... "
 
     RESFILE="${TFILES}${STEP}"
     echo "Result File: ${RESFILE}" > ${RESFILE}
 
-    #-------------------------------------------------------
-    # start a new dispatcher with a clean database table
-    #-------------------------------------------------------
-    echo "DROP TABLE IF EXISTS Queue;" | ${MYSQL} simq
-    ./dispatcher >DISPATCHER.log 2>&1 &
-    DISPATCHER_PID=$!
-    echo "Started dispatcher with PID: ${DISPATCHER_PID}" >> ${RESFILE}
-    sleep 2
-
     #----------------------------------
-    # Check if dispatcher is running
+    # Create a new simulation
     #----------------------------------
-    if ! ps -p ${DISPATCHER_PID} > /dev/null; then
-        echo "Dispatcher failed to start"
-        exit 1
-    fi
-
-    #----------------------------------
-    # Send commands to the dispatcher
-    #----------------------------------
-    # Add a new simulation
-    ADD_CMD='{ "command": "NewSimulation", "username": "test-user", "data": { "file": "path/to/simulation.tar.gz", "name": "Test Simulation", "priority": 5, "description": "A test simulation", "url": "http://localhost:8080" } }'
-    send_command "${ADD_CMD}" "NewSimulation"
+    ADD_CMD='{"name":"Test Simulation","priority":5,"description":"A test simulation","url":"http://localhost:8080","original_filename":"config.json5"}'
+    send_command_with_file "NewSimulation" "${ADD_CMD}" "config.json5"
     sleep 1
 
     #----------------------------------
@@ -183,6 +239,7 @@ if [[ "${SINGLETEST}${TFILES}" = "${TFILES}" || "${SINGLETEST}${TFILES}" = "${TF
     GET_QUEUE_CMD='{ "command": "GetActiveQueue", "username": "test-user" }'
     send_command "${GET_QUEUE_CMD}" "GetActiveQueue"
     sleep 1
+
     #----------------------------------
     # Delete the simulation
     #---------------------------------- 
@@ -216,4 +273,3 @@ echo "Total errors: ${ERRORCOUNT}"
 if [ "${ERRORCOUNT}" -gt 0 ]; then
     exit 2
 fi
-

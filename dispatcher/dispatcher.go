@@ -1,12 +1,13 @@
 package main
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/stmansour/simq/data"
@@ -21,12 +22,12 @@ type Command struct {
 
 // CreateQueueEntryRequest represents the data for creating a queue entry
 type CreateQueueEntryRequest struct {
-	FileContent string `json:"FileContent"`
-	Name        string `json:"name"`
-	Priority    int    `json:"priority"`
-	Description string `json:"description"`
-	URL         string `json:"url"`
-	File        string `json:"file"`
+	FileContent      string `json:"FileContent"`
+	Name             string `json:"name"`
+	Priority         int    `json:"priority"`
+	Description      string `json:"description"`
+	URL              string `json:"url"`
+	OriginalFilename string `json:"original_filename"`
 }
 
 // UpdateItemRequest represents the data for updating a queue item
@@ -55,14 +56,33 @@ var handlerTable = map[string]HandlerTableEntry{
 }
 
 // commandDispatcher dispatches commands to appropriate handlers
+// commandDispatcher dispatches commands to appropriate handlers
 func commandDispatcher(w http.ResponseWriter, r *http.Request) {
 	var cmd Command
 	var ok bool
 	h := HandlerTableEntry{}
 
-	if err := json.NewDecoder(r.Body).Decode(&cmd); err != nil {
-		http.Error(w, "Invalid request payload", http.StatusBadRequest)
-		return
+	// Check if the request is multipart/form-data
+	if r.Header.Get("Content-Type") != "" && strings.Contains(r.Header.Get("Content-Type"), "multipart/form-data") {
+		// Parse multipart form
+		if err := r.ParseMultipartForm(10 << 20); err != nil {
+			http.Error(w, "Failed to parse multipart form", http.StatusBadRequest)
+			return
+		}
+
+		// Extract command fields from form data
+		cmd.Command = r.FormValue("command")
+		cmd.Username = r.FormValue("username")
+
+		// Extract and marshal the data part
+		dataPart := r.FormValue("data")
+		cmd.Data = json.RawMessage(dataPart)
+	} else {
+		// Parse JSON payload
+		if err := json.NewDecoder(r.Body).Decode(&cmd); err != nil {
+			http.Error(w, "Invalid request payload", http.StatusBadRequest)
+			return
+		}
 	}
 
 	log.Printf("\tcommand: %s", cmd.Command)
@@ -79,6 +99,7 @@ func commandDispatcher(w http.ResponseWriter, r *http.Request) {
 // handleNewSimulation handles the NewSimulation command
 // It creates a new entry in the queue
 // ---------------------------------------------------------------------------
+// handleNewSimulation handles the NewSimulation command
 func handleNewSimulation(w http.ResponseWriter, r *http.Request, cmd *Command) {
 	var req CreateQueueEntryRequest
 	err := json.Unmarshal(cmd.Data, &req)
@@ -87,13 +108,14 @@ func handleNewSimulation(w http.ResponseWriter, r *http.Request, cmd *Command) {
 		return
 	}
 
-	// Decode the base64 file content
-	fileContent, err := base64.StdEncoding.DecodeString(req.FileContent)
+	// Retrieve the file from the form
+	file, _, err := r.FormFile("file")
 	if err != nil {
-		log.Printf("Failed to decode file content: %v", err)
-		http.Error(w, "Failed to decode file content", http.StatusBadRequest)
+		log.Printf("Failed to get file from form: %v", err)
+		http.Error(w, "Failed to get file from form", http.StatusBadRequest)
 		return
 	}
+	defer file.Close()
 
 	// Create the directory if it doesn't exist
 	err = os.MkdirAll("qdconfigs", os.ModePerm)
@@ -112,8 +134,9 @@ func handleNewSimulation(w http.ResponseWriter, r *http.Request, cmd *Command) {
 	}
 	defer tempFile.Close()
 
-	// Write the decoded content to the file
-	if _, err := tempFile.Write(fileContent); err != nil {
+	// Write the file content to the temporary file
+	_, err = io.Copy(tempFile, file)
+	if err != nil {
 		log.Printf("Failed to write file content: %v", err)
 		http.Error(w, "Failed to write file content", http.StatusInternalServerError)
 		return
@@ -136,16 +159,16 @@ func handleNewSimulation(w http.ResponseWriter, r *http.Request, cmd *Command) {
 		return
 	}
 
-	// make the new directory
+	// Create the new directory for the simulation using the SID
 	err = os.MkdirAll(fmt.Sprintf("qdconfigs/%d", sid), os.ModePerm)
 	if err != nil {
-		log.Printf("Failed to make directory qdconfigs/%d: %v", sid, err)
+		log.Printf("Failed to create directory qdconfigs/%d: %v", sid, err)
 		http.Error(w, "Failed to create directory", http.StatusInternalServerError)
 		return
 	}
 
-	// Rename the file to include the queue item ID
-	newFilePath := fmt.Sprintf("qdconfigs/%d/config.json5", sid)
+	// Rename the file to include the original filename
+	newFilePath := fmt.Sprintf("qdconfigs/%d/%s", sid, req.OriginalFilename)
 	if err := os.Rename(tempFile.Name(), newFilePath); err != nil {
 		log.Printf("Failed to rename %s to %s: %v", tempFile.Name(), newFilePath, err)
 		http.Error(w, "Failed to rename file", http.StatusInternalServerError)
