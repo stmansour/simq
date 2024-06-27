@@ -3,10 +3,12 @@ package main
 import (
 	"bytes"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
@@ -37,29 +39,43 @@ func initTest(t *testing.T) (*data.QueueManager, error) {
 	return qm, nil
 }
 
-func TestCommandDispatcher(t *testing.T) {
+func TestHandleNewSimulation(t *testing.T) {
 	qm, err := initTest(t)
 	if err != nil {
 		t.Fatalf("Failed to initialize test: %v", err)
 	}
 	app.qm = qm
 
-	// Test data for creating a queue entry
+	// Read the config.json5 file
+	fileContent, err := os.ReadFile("config.json5")
+	if err != nil {
+		t.Fatalf("Failed to read config file: %v", err)
+	}
+
+	// Encode the file content as base64
+	encodedContent := base64.StdEncoding.EncodeToString(fileContent)
+
 	createReq := CreateQueueEntryRequest{
-		File:        "placeholder",
+		FileContent: encodedContent,
 		Name:        "Test Simulation",
 		Priority:    5,
 		Description: "A test simulation",
 		URL:         "http://localhost:8080",
 	}
-	reqData, _ := json.Marshal(createReq)
+	reqData, err := json.Marshal(createReq)
+	if err != nil {
+		t.Fatalf("Failed to marshal create request: %v", err)
+	}
 
 	cmd := Command{
 		Command:  "NewSimulation",
 		Username: "test-user",
 		Data:     reqData,
 	}
-	cmdData, _ := json.Marshal(cmd)
+	cmdData, err := json.Marshal(cmd)
+	if err != nil {
+		t.Fatalf("Failed to marshal command: %v", err)
+	}
 
 	// Create a new HTTP request
 	req, err := http.NewRequest("POST", "/command", bytes.NewBuffer(cmdData))
@@ -80,15 +96,78 @@ func TestCommandDispatcher(t *testing.T) {
 		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusCreated)
 	}
 
-	// Check the response body
 	var resp SvcStatus201
 	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
 		t.Errorf("Failed to unmarshal response: %v", err)
 	}
-	if resp.Status != "success" || resp.ID != 1 {
-		t.Errorf("handler returned issues: status = %q want %q", resp.Status, "success")
+	if resp.Status != "success" {
+		t.Errorf("handler returned unexpected status: got %q want %q", resp.Status, "success")
+	}
+
+	expectedFile := fmt.Sprintf("qdconfigs/%d/config.json5", resp.ID)
+	if _, err := os.Stat(expectedFile); os.IsNotExist(err) {
+		t.Errorf("Expected file %s to be saved, but it does not exist", expectedFile)
+	} else if err != nil {
+		t.Errorf("Error checking for expected file: %v", err)
+	}
+
+	// Clean up the created file
+	if err := os.Remove(expectedFile); err != nil {
+		t.Errorf("Failed to clean up test file: %v", err)
 	}
 }
+
+// func TestCommandDispatcher(t *testing.T) {
+// 	qm, err := initTest(t)
+// 	if err != nil {
+// 		t.Fatalf("Failed to initialize test: %v", err)
+// 	}
+// 	app.qm = qm
+
+// 	// Test data for creating a queue entry
+// 	createReq := CreateQueueEntryRequest{
+// 		Name:        "Test Simulation",
+// 		Priority:    5,
+// 		Description: "A test simulation",
+// 		URL:         "http://localhost:8080",
+// 	}
+// 	reqData, _ := json.Marshal(createReq)
+
+// 	cmd := Command{
+// 		Command:  "NewSimulation",
+// 		Username: "test-user",
+// 		Data:     reqData,
+// 	}
+// 	cmdData, _ := json.Marshal(cmd)
+
+// 	// Create a new HTTP request
+// 	req, err := http.NewRequest("POST", "/command", bytes.NewBuffer(cmdData))
+// 	if err != nil {
+// 		t.Fatalf("Failed to create request: %v", err)
+// 	}
+// 	req.Header.Set("Content-Type", "application/json")
+
+// 	// Create a ResponseRecorder to record the response
+// 	rr := httptest.NewRecorder()
+// 	handler := http.HandlerFunc(commandDispatcher)
+
+// 	// Call the handler
+// 	handler.ServeHTTP(rr, req)
+
+// 	// Check the status code
+// 	if status := rr.Code; status != http.StatusCreated {
+// 		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusCreated)
+// 	}
+
+// 	// Check the response body
+// 	var resp SvcStatus201
+// 	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+// 		t.Errorf("Failed to unmarshal response: %v", err)
+// 	}
+// 	if resp.Status != "success" || resp.ID != 1 {
+// 		t.Errorf("handler returned issues: status = %q want %q", resp.Status, "success")
+// 	}
+// }
 
 func TestHandleShutdown(t *testing.T) {
 	qm, err := initTest(t)
@@ -193,7 +272,7 @@ func TestHandleGetActiveQueue(t *testing.T) {
 	}
 
 	// Check the response body is what we expect.
-	expectedOrder := []int{2, 1, 8, 5, 6, 3, 7, 10, 4, 9}
+	expectedOrder := []int64{2, 1, 8, 5, 6, 3, 7, 10, 4, 9}
 	for i, item := range resp.Data {
 		if item.SID != expectedOrder[i] {
 			t.Errorf("Item order mismatch at position %d: got %d want %d", i, item.SID, expectedOrder[i])

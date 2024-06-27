@@ -1,18 +1,18 @@
 Result File: a0
 Started dispatcher with PROCESSID_PLACEHOLDER
-Sending NewSimulation command: { "command": "NewSimulation", "username": "test-user", "data": { "file": "path/to/simulation.tar.gz", "name": "Test Simulation", "priority": 5, "description": "A test simulation", "url": "http://localhost:8080" } }
+Sending NewSimulation command: curl -s -X POST http://localhost:8250/command -d "{ "command": "NewSimulation", "username": "test-user", "data": { "file": "path/to/simulation.tar.gz", "name": "Test Simulation", "priority": 5, "description": "A test simulation", "url": "http://localhost:8080" } }" -H "Content-Type: application/json"
 {
   "status": "success",
   "message": "Created queue item",
   "id": 1
 }
-Sending GetActiveQueue command: { "command": "GetActiveQueue", "username": "test-user" }
+Sending GetActiveQueue command: curl -s -X POST http://localhost:8250/command -d "{ "command": "GetActiveQueue", "username": "test-user" }" -H "Content-Type: application/json"
 {
   "Status": "success",
   "Data": [
     {
       "SID": 1,
-      "File": "placeholder",
+      "File": "TMPFILE_PLACEHOLDER",
       "Name": "Test Simulation",
       "Priority": 5,
       "Description": "A test simulation",
@@ -31,7 +31,7 @@ Sending GetActiveQueue command: { "command": "GetActiveQueue", "username": "test
     }
   ]
 }
-Sending DeleteItem command: { "command": "DeleteItem", "username": "test-user", "data": { "sid": 1 } }
+Sending DeleteItem command: curl -s -X POST http://localhost:8250/command -d "{ "command": "DeleteItem", "username": "test-user", "data": { "sid": 1 } }" -H "Content-Type: application/json"
 {
   "status": "success",
   "message": "deleted",

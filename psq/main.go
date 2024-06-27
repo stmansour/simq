@@ -13,36 +13,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/stmansour/simq/data"
 	"github.com/stmansour/simq/util"
-	"github.com/yosuke-furukawa/json5/encoding/json5"
-)
-
-// Command represents the structure of a command
-type Command struct {
-	Command  string          `json:"command"`
-	Username string          `json:"username"`
-	Data     json.RawMessage `json:"data"`
-}
-
-// CreateQueueEntryRequest represents the data for creating a queue entry
-type CreateQueueEntryRequest struct {
-	File     string `json:"file"`
-	Name     string `json:"name"`
-	Priority int    `json:"priority"`
-	URL      string `json:"url"`
-}
-
-// Config represents the structure of a config
-type Config struct {
-	SimulationName string `json:"SimulationName"`
-	C1             string `json:"C1"`
-	C2             string `json:"C2"`
-}
-
-const (
-	defaultPriority = 5
-	defaultURL      = "http://localhost:8250/command"
 )
 
 var app struct {
@@ -90,8 +61,7 @@ func interactiveMode(username string) {
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		fmt.Print("psq> ")
-		var input string
-		input, _ = reader.ReadString('\n')
+		input, _ := reader.ReadString('\n')
 		input = strings.TrimSpace(input)
 		args := strings.Fields(input)
 		if len(args) == 0 {
@@ -114,9 +84,10 @@ func interactiveMode(username string) {
 			if len(args) > 1 {
 				sid, err := strconv.ParseInt(args[1], 10, 64)
 				if err != nil {
-					fmt.Println("Error: 'delete' command requires a simulation ID.")
+					fmt.Println("Error: 'delete' command requires a valid simulation ID.")
+				} else {
+					deleteJob(username, sid)
 				}
-				deleteJob(username, sid)
 			} else {
 				fmt.Println("Error: 'delete' command requires a simulation ID.")
 			}
@@ -135,81 +106,6 @@ func interactiveMode(username string) {
 	}
 }
 
-func addJob(username, file string) {
-	config, err := readConfig(file)
-	if err != nil {
-		fmt.Printf("Error reading config file: %v\n", err)
-		return
-	}
-
-	data := CreateQueueEntryRequest{
-		File:     file,
-		Name:     config.SimulationName,
-		Priority: defaultPriority,
-		URL:      defaultURL,
-	}
-
-	dataBytes, _ := json.Marshal(data)
-	cmd := Command{
-		Command:  "NewSimulation",
-		Username: username,
-		Data:     json.RawMessage(dataBytes),
-	}
-
-	sendRequest(cmd)
-}
-
-func readConfig(file string) (Config, error) {
-	var config Config
-	configBytes, err := os.ReadFile(file)
-	if err != nil {
-		return config, err
-	}
-
-	err = json5.Unmarshal(configBytes, &config)
-	return config, err
-}
-
-func listJobs(username string) {
-	cmd := Command{
-		Command:  "GetActiveQueue",
-		Username: username,
-	}
-
-	body := sendRequest(cmd)
-
-	resp := struct {
-		Status string
-		Data   []data.QueueItem
-	}{}
-	err := json.Unmarshal(body, &resp)
-	if err != nil {
-		fmt.Printf("Error unmarshalling response: %v\n", err)
-		return
-	}
-
-	for _, item := range resp.Data {
-		fmt.Printf("SID: %3d. Pri: %2d, St: %d, Name: %s, File: %s\n", item.SID, item.Priority, item.State, item.Name, item.File)
-	}
-}
-
-func deleteJob(username string, sid int64) {
-	data := struct {
-		SID int64 `json:"sid"`
-	}{
-		SID: sid,
-	}
-
-	dataBytes, _ := json.Marshal(data)
-	cmd := Command{
-		Command:  "DeleteItem",
-		Username: username,
-		Data:     json.RawMessage(dataBytes),
-	}
-
-	sendRequest(cmd)
-}
-
 func sendRequest(cmd Command) []byte {
 	cmdBytes, _ := json.Marshal(cmd)
 	resp, err := http.Post(defaultURL, "application/json", bytes.NewBuffer(cmdBytes))
@@ -218,6 +114,11 @@ func sendRequest(cmd Command) []byte {
 		return nil
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		fmt.Printf("Received non-OK HTTP status: %s\n", resp.Status)
+		return nil
+	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

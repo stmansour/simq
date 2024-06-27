@@ -39,7 +39,7 @@ EOF
 send_command() {
     local CMD=$1
     local DESCRIPTION=$2
-    echo "Sending ${DESCRIPTION} command: ${CMD}" >> ${RESFILE}
+    echo "Sending ${DESCRIPTION} command: curl -s -X POST http://localhost:8250/command -d \"${CMD}\" -H \"Content-Type: application/json\"" >> ${RESFILE}
     local RESPONSE=$(curl -s -X POST http://localhost:8250/command -d "${CMD}" -H "Content-Type: application/json")
     echo "Response: ${RESPONSE}" >> serverresponse
     echo "${RESPONSE}" | jq . >> ${RESFILE}
@@ -69,6 +69,7 @@ compareToGold() {
         -e 's/dispatcher with PID:.*/dispatcher with PROCESSID_PLACEHOLDER/' \
         -e 's/Current Time:.*/Current Time: TIME_PLACEHOLDER/' \
         -e 's/Random number seed:[[:space:]]+[0-9]+/Random number seed: SEED_PLACEHOLDER/' \
+        -e 's/qdconfigs.*json5/TMPFILE_PLACEHOLDER/' \
         -e 's/Archive directory:.*/Archive directory: PLACEHOLDER/' \
         -e 's/Elapsed time:.*/Archive directory: PLACEHOLDER/' \
         -e 's/ - [0-9a-zA-Z-]{64}/ - GUID/' \

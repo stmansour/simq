@@ -28,7 +28,7 @@ type QueueManager struct {
 
 // QueueItem is an item in the queue
 type QueueItem struct {
-	SID         int
+	SID         int64
 	File        string
 	Name        string
 	Priority    int
@@ -81,7 +81,7 @@ func (qm *QueueManager) RemoveSchemaForTesting() error {
 func (qm *QueueManager) EnsureSchemaExists() error {
 	cmds := []string{
 		`CREATE TABLE IF NOT EXISTS Queue (
-		SID INT AUTO_INCREMENT PRIMARY KEY,
+		SID BIGINT AUTO_INCREMENT PRIMARY KEY,
 		File VARCHAR(80) NOT NULL,
 		Name VARCHAR(80) NOT NULL DEFAULT '',
 		Priority INT NOT NULL DEFAULT 5,

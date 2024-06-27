@@ -57,7 +57,7 @@ func TestQueueManager(t *testing.T) {
 	fmt.Printf("Inserted item with SID %d\n", sid)
 
 	// Update the item to set DtCompleted
-	newItem.SID = int(sid)
+	newItem.SID = sid
 	newItem.State = StateBooked
 	newItem.DtCompleted = sql.NullTime{Time: time.Now(), Valid: true}
 	err = qm.UpdateItem(newItem)
@@ -114,7 +114,7 @@ func TestUpdateItem_NullDtEstimate(t *testing.T) {
 	}
 
 	// Update the item with NULL DtEstimate
-	newItem.SID = int(sid)
+	newItem.SID = sid
 	newItem.DtEstimate = sql.NullTime{Valid: false}
 	err = qm.UpdateItem(newItem)
 	if err != nil {
@@ -198,7 +198,7 @@ func TestGetActiveQueue(t *testing.T) {
 		return
 	}
 
-	expectedOrder := []int{2, 1, 8, 5, 6, 3, 7, 10, 4, 9}
+	expectedOrder := []int64{2, 1, 8, 5, 6, 3, 7, 10, 4, 9}
 	for i, item := range queueItems {
 		if item.SID != expectedOrder[i] {
 			t.Errorf("Item order mismatch at position %d: got %d want %d", i, item.SID, expectedOrder[i])
@@ -236,7 +236,7 @@ func TestGetItemByID(t *testing.T) {
 	}
 
 	// Verify the retrieved item matches the inserted item
-	if retrievedItem.SID != int(sid) {
+	if retrievedItem.SID != sid {
 		t.Errorf("Retrieved SID does not match: got %d want %d", retrievedItem.SID, int(sid))
 	}
 	if retrievedItem.File != newItem.File {
