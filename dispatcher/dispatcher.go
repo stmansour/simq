@@ -153,6 +153,12 @@ func handleNewSimulation(w http.ResponseWriter, r *http.Request, cmd *Command) {
 	}
 	defer tempFile.Close()
 
+	if len(fileContent) == 0 {
+		log.Printf("ERROR file content: %d\n", len(fileContent))
+		http.Error(w, "No file content. 0-length file.", http.StatusInternalServerError)
+		return
+	}
+
 	// Write the file content to the temp file
 	if _, err := tempFile.Write(fileContent); err != nil {
 		log.Printf("Failed to write file content: %v", err)
