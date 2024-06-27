@@ -138,58 +138,6 @@ func TestHandleNewSimulation(t *testing.T) {
 	}
 }
 
-// func TestCommandDispatcher(t *testing.T) {
-// 	qm, err := initTest(t)
-// 	if err != nil {
-// 		t.Fatalf("Failed to initialize test: %v", err)
-// 	}
-// 	app.qm = qm
-
-// 	// Test data for creating a queue entry
-// 	createReq := CreateQueueEntryRequest{
-// 		Name:        "Test Simulation",
-// 		Priority:    5,
-// 		Description: "A test simulation",
-// 		URL:         "http://localhost:8080",
-// 	}
-// 	reqData, _ := json.Marshal(createReq)
-
-// 	cmd := Command{
-// 		Command:  "NewSimulation",
-// 		Username: "test-user",
-// 		Data:     reqData,
-// 	}
-// 	cmdData, _ := json.Marshal(cmd)
-
-// 	// Create a new HTTP request
-// 	req, err := http.NewRequest("POST", "/command", bytes.NewBuffer(cmdData))
-// 	if err != nil {
-// 		t.Fatalf("Failed to create request: %v", err)
-// 	}
-// 	req.Header.Set("Content-Type", "application/json")
-
-// 	// Create a ResponseRecorder to record the response
-// 	rr := httptest.NewRecorder()
-// 	handler := http.HandlerFunc(commandDispatcher)
-
-// 	// Call the handler
-// 	handler.ServeHTTP(rr, req)
-
-// 	// Check the status code
-// 	if status := rr.Code; status != http.StatusCreated {
-// 		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusCreated)
-// 	}
-
-// 	// Check the response body
-// 	var resp SvcStatus201
-// 	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
-// 		t.Errorf("Failed to unmarshal response: %v", err)
-// 	}
-// 	if resp.Status != "success" || resp.ID != 1 {
-// 		t.Errorf("handler returned issues: status = %q want %q", resp.Status, "success")
-// 	}
-// }
-
 func TestHandleShutdown(t *testing.T) {
 	qm, err := initTest(t)
 	if err != nil {
@@ -385,7 +333,7 @@ func TestHandleDeleteItem(t *testing.T) {
 
 	// Insert a new item
 	newItem := data.QueueItem{
-		File:        "/path/to/simulation.tar.gz",
+		File:        "dummyfile.tar.gz",
 		Name:        "Test Simulation",
 		Priority:    5,
 		Description: "A test simulation",
@@ -395,6 +343,18 @@ func TestHandleDeleteItem(t *testing.T) {
 	sid, err := qm.InsertItem(newItem)
 	if err != nil {
 		t.Fatalf("Failed to insert item: %v", err)
+	}
+
+	// Create the directory and file for the new item
+	dirPath := fmt.Sprintf("qdconfigs/%d", sid)
+	err = os.MkdirAll(dirPath, os.ModePerm)
+	if err != nil {
+		t.Fatalf("Failed to create directory: %v", err)
+	}
+	filePath := fmt.Sprintf("%s/config.json5", dirPath)
+	_, err = os.Create(filePath)
+	if err != nil {
+		t.Fatalf("Failed to create file: %v", err)
 	}
 
 	// Create the delete request
@@ -434,5 +394,10 @@ func TestHandleDeleteItem(t *testing.T) {
 	_, err = qm.GetItemByID(int(sid))
 	if err == nil {
 		t.Errorf("Expected item to be deleted, but it still exists")
+	}
+
+	// Verify the directory and file were deleted
+	if _, err := os.Stat(dirPath); !os.IsNotExist(err) {
+		t.Errorf("Expected directory %s to be deleted, but it still exists", dirPath)
 	}
 }
