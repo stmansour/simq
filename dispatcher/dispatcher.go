@@ -56,7 +56,7 @@ var handlerTable = map[string]HandlerTableEntry{
 }
 
 // commandDispatcher dispatches commands to appropriate handlers
-// commandDispatcher dispatches commands to appropriate handlers
+// -----------------------------------------------------------------------------
 func commandDispatcher(w http.ResponseWriter, r *http.Request) {
 	var cmd Command
 	var ok bool
@@ -199,6 +199,7 @@ func handleShutdown(w http.ResponseWriter, r *http.Request, cmd *Command) {
 }
 
 // handleGetActiveQueue handles the GetActiveQueue command
+// -----------------------------------------------------------------------------
 func handleGetActiveQueue(w http.ResponseWriter, r *http.Request, cmd *Command) {
 	items, err := app.qm.GetQueuedAndExecutingItems()
 	if err != nil {
@@ -218,6 +219,7 @@ func handleGetActiveQueue(w http.ResponseWriter, r *http.Request, cmd *Command) 
 }
 
 // handleUpdateItem handles the UpdateItem command
+// -----------------------------------------------------------------------------
 func handleUpdateItem(w http.ResponseWriter, r *http.Request, cmd *Command) {
 	var req UpdateItemRequest
 	if err := json.Unmarshal(cmd.Data, &req); err != nil {
@@ -249,6 +251,8 @@ func handleUpdateItem(w http.ResponseWriter, r *http.Request, cmd *Command) {
 }
 
 // handleDeleteItem handles the DeleteItem command
+// -----------------------------------------------------------------------------
+// handleDeleteItem handles the DeleteItem command
 func handleDeleteItem(w http.ResponseWriter, r *http.Request, cmd *Command) {
 	var req DeleteItemRequest
 	if err := json.Unmarshal(cmd.Data, &req); err != nil {
@@ -256,7 +260,24 @@ func handleDeleteItem(w http.ResponseWriter, r *http.Request, cmd *Command) {
 		return
 	}
 
+	// Retrieve the queue item to get the associated file path
+	_, err := app.qm.GetItemByID(req.SID)
+	if err != nil {
+		http.Error(w, "Item not found", http.StatusNotFound)
+		return
+	}
+
+	// Delete the file and directory associated with the queue item
+	dirPath := fmt.Sprintf("qdconfigs/%d", req.SID)
+	if err := os.RemoveAll(dirPath); err != nil {
+		log.Printf("Failed to remove directory %s: %v", dirPath, err)
+		http.Error(w, "Failed to remove associated files", http.StatusInternalServerError)
+		return
+	}
+
+	// Delete the queue item from the database
 	if err := app.qm.DeleteItem(req.SID); err != nil {
+		log.Printf("Failed to delete queue item %d: %v", req.SID, err)
 		http.Error(w, "Failed to delete queue item", http.StatusInternalServerError)
 		return
 	}
