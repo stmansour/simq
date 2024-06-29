@@ -2,6 +2,7 @@ package data
 
 import (
 	"database/sql"
+	"fmt"
 	"time"
 
 	// Register the SQL driver
@@ -172,4 +173,23 @@ func (qm *QueueManager) GetQueuedAndExecutingItems() ([]QueueItem, error) {
 	}
 
 	return items, nil
+}
+
+// GetHighestPriorityQueuedItem retrieves the highest priority item from the queue
+func (qm *QueueManager) GetHighestPriorityQueuedItem() (QueueItem, error) {
+	var item QueueItem
+
+	// Query to select the highest priority queued item
+	query := `SELECT SID, File, Name, Priority, Description, URL, State, DtEstimate, DtCompleted, Created, Modified
+			  FROM Queue WHERE State = ? ORDER BY Priority ASC, SID ASC LIMIT 1`
+	row := qm.db.QueryRow(query, StateQueued)
+	err := row.Scan(&item.SID, &item.File, &item.Name, &item.Priority, &item.Description, &item.URL, &item.State, &item.DtEstimate, &item.DtCompleted, &item.Created, &item.Modified)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return QueueItem{}, fmt.Errorf("no queued items found")
+		}
+		return QueueItem{}, fmt.Errorf("failed to get highest priority queued item: %w", err)
+	}
+
+	return item, nil
 }

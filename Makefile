@@ -1,5 +1,5 @@
 # test comment
-DIRS=util data dispatcher psq
+DIRS=util data dispatcher psq simd
 DIST=dist 
 TEST_FAILURE_FILE=fail
 # Temporary file for storing start time
@@ -67,7 +67,9 @@ stats:
 	@find . -name "*.go" | srcstats
 
 release:
-	@echo "Not implemented"
+	cp -r dist/simq /usr/local/simq/;cd /usr/local/simq;rm -rf bin;mv simq bin;
+	if [ -d /usr/local/share/man/man1 ] && [ -w /usr/local/share/man/man1 ]; then cp ./dist/simq/man/man1/* /usr/local/share/man/man1/ ; fi
+	@echo "*** RELEASED TO:  /usr/local/simq/bin ***"
 
 refmt:
 	fmt design.txt > design.txt1 ; mv design.txt1 design.txt

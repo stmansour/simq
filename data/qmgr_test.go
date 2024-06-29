@@ -33,6 +33,63 @@ func initTest(t *testing.T) (*QueueManager, error) {
 	return qm, nil
 }
 
+// TestGetHighestPriorityQueuedItem tests the retrieval of the highest priority item
+func TestGetHighestPriorityQueuedItem(t *testing.T) {
+	qm, err := initTest(t)
+	if err != nil {
+		return
+	}
+
+	// Insert test items with varying priorities
+	items := []QueueItem{
+		{File: "file1.json5", Name: "Simulation 1", Priority: 3, Description: "Test 1", URL: "http://localhost", State: StateQueued},
+		{File: "file2.json5", Name: "Simulation 2", Priority: 5, Description: "Test 2", URL: "http://localhost", State: StateQueued},
+		{File: "file3.json5", Name: "Simulation 3", Priority: 1, Description: "Test 3", URL: "http://localhost", State: StateQueued},
+	}
+
+	for _, item := range items {
+		_, err := qm.InsertItem(item)
+		if err != nil {
+			t.Fatalf("Failed to insert item: %v", err)
+		}
+	}
+
+	// Retrieve the highest priority item
+	highestPriorityItem, err := qm.GetHighestPriorityQueuedItem()
+	if err != nil {
+		t.Fatalf("Failed to get highest priority queued item: %v", err)
+	}
+
+	if highestPriorityItem.Priority != 1 {
+		t.Errorf("Expected priority 1, got %d", highestPriorityItem.Priority)
+	}
+
+	// Insert another item with the same highest priority but different timestamp
+	time.Sleep(1 * time.Second) // Ensure a different timestamp
+	newItem := QueueItem{
+		File:        "file4.json5",
+		Name:        "Simulation 4",
+		Priority:    1,
+		Description: "Test 4",
+		URL:         "http://localhost",
+		State:       StateQueued,
+	}
+	_, err = qm.InsertItem(newItem)
+	if err != nil {
+		t.Fatalf("Failed to insert new highest priority item: %v", err)
+	}
+
+	// Retrieve the highest priority item again
+	highestPriorityItem, err = qm.GetHighestPriorityQueuedItem()
+	if err != nil {
+		t.Fatalf("Failed to get highest priority queued item: %v", err)
+	}
+
+	if highestPriorityItem.Name != "Simulation 3" {
+		t.Errorf("Expected 'Simulation 3', got %s", highestPriorityItem.Name)
+	}
+}
+
 // TestQueueManager tests the basic functionalities of QueueManager
 func TestQueueManager(t *testing.T) {
 	qm, err := initTest(t)

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"strings"
@@ -47,12 +48,37 @@ type HandlerTableEntry struct {
 	Handler func(w http.ResponseWriter, r *http.Request, cmd *Command)
 }
 
+// SimulationBookingRequest represents the data for booking a simulation
+type SimulationBookingRequest struct {
+	Command         string
+	Username        string
+	MachineID       string
+	CPUs            int
+	Memory          string
+	CPUArchitecture string
+	Availability    string
+}
+
+// BookedResponse represents the response for booking a simulation
+type BookedResponse struct {
+	Status         string
+	SID            int64
+	ConfigFilename string
+}
+
 var handlerTable = map[string]HandlerTableEntry{
+	"Book":           {Handler: handleBook},
 	"DeleteItem":     {Handler: handleDeleteItem},
 	"GetActiveQueue": {Handler: handleGetActiveQueue},
 	"NewSimulation":  {Handler: handleNewSimulation},
 	"Shutdown":       {Handler: handleShutdown},
 	"UpdateItem":     {Handler: handleUpdateItem},
+}
+
+// LogAndErrorReturn logs an error and returns an error
+func LogAndErrorReturn(w http.ResponseWriter, err error) {
+	log.Printf("Error: %v", err)
+	http.Error(w, err.Error(), http.StatusInternalServerError)
 }
 
 // commandDispatcher dispatches commands to appropriate handlers
@@ -88,12 +114,97 @@ func commandDispatcher(w http.ResponseWriter, r *http.Request) {
 	log.Printf("\tcommand: %s", cmd.Command)
 
 	if h, ok = handlerTable[cmd.Command]; !ok {
-		log.Printf("\tUnknown command: %s", cmd.Command)
-		http.Error(w, "Unknown command", http.StatusBadRequest)
+		LogAndErrorReturn(w, fmt.Errorf("unknown command: %s", cmd.Command))
 		return
 	}
 
 	h.Handler(w, r, &cmd)
+}
+
+// handleBook handles the Book command
+// ---------------------------------------------------------------------------
+func handleBook(w http.ResponseWriter, r *http.Request, cmd *Command) {
+	// Decode the booking request
+	var bookingRequest SimulationBookingRequest
+	if err := json.Unmarshal(cmd.Data, &bookingRequest); err != nil {
+		http.Error(w, "Invalid booking request data", http.StatusBadRequest)
+		return
+	}
+
+	//---------------------------------------------------
+	// Retrieve the highest priority job from the queue
+	//---------------------------------------------------
+	queueItem, err := app.qm.GetHighestPriorityQueuedItem()
+	if err != nil {
+		http.Error(w, "Failed to get highest priority queued item", http.StatusInternalServerError)
+		return
+	}
+
+	//*****************************************************************************
+	// Mark the item as booked
+	//*****************************************************************************
+	queueItem.State = data.StateBooked
+	if err := app.qm.UpdateItem(queueItem); err != nil {
+		http.Error(w, "Failed to update queue item", http.StatusInternalServerError)
+		return
+	}
+
+	//-----------------------------------------------------------------------------
+	// Create the response
+	//-----------------------------------------------------------------------------
+	response := BookedResponse{
+		Status:         "success",
+		SID:            queueItem.SID,
+		ConfigFilename: "config.json5",
+	}
+
+	//-------------------------
+	// multipart writer
+	//-------------------------
+	multipartWriter := multipart.NewWriter(w)
+	w.Header().Set("Content-Type", multipartWriter.FormDataContentType())
+
+	//-------------------------
+	// JSON part
+	//-------------------------
+	jsonWriter, err := multipartWriter.CreateFormField("json")
+	if err != nil {
+		http.Error(w, "Failed to create JSON part", http.StatusInternalServerError)
+		return
+	}
+	if err := json.NewEncoder(jsonWriter).Encode(response); err != nil {
+		http.Error(w, "Failed to encode JSON response", http.StatusInternalServerError)
+		return
+	}
+
+	//----------------------------
+	// Config file part
+	//----------------------------
+	configFilePath := fmt.Sprintf("qdconfigs/%d/%s", queueItem.SID, response.ConfigFilename)
+	configFile, err := os.Open(configFilePath)
+	if err != nil {
+		http.Error(w, "Failed to open config file", http.StatusInternalServerError)
+		return
+	}
+	defer configFile.Close()
+
+	fileWriter, err := multipartWriter.CreateFormFile("file", response.ConfigFilename)
+	if err != nil {
+		http.Error(w, "Failed to create file part", http.StatusInternalServerError)
+		return
+	}
+	if _, err := io.Copy(fileWriter, configFile); err != nil {
+		http.Error(w, "Failed to send config file", http.StatusInternalServerError)
+		return
+	}
+
+	//----------------------------
+	// Close the multipart writer
+	//----------------------------
+	if err := multipartWriter.Close(); err != nil {
+		http.Error(w, "Failed to close multipart writer", http.StatusInternalServerError)
+		return
+	}
 }
 
 // handleNewSimulation handles the NewSimulation command
@@ -102,8 +213,7 @@ func commandDispatcher(w http.ResponseWriter, r *http.Request) {
 func handleNewSimulation(w http.ResponseWriter, r *http.Request, cmd *Command) {
 	// Parse the multipart form data
 	if err := r.ParseMultipartForm(10 << 20); err != nil {
-		log.Printf("Failed to parse multipart form: %v", err)
-		http.Error(w, "Failed to parse multipart form", http.StatusBadRequest)
+		LogAndErrorReturn(w, fmt.Errorf("failed to parse multipart form: %v", err))
 		return
 	}
 
@@ -139,30 +249,26 @@ func handleNewSimulation(w http.ResponseWriter, r *http.Request, cmd *Command) {
 	// Create the directory if it doesn't exist
 	err = os.MkdirAll("qdconfigs", os.ModePerm)
 	if err != nil {
-		log.Printf("Failed to create directory: %v", err)
-		http.Error(w, "Failed to create directory", http.StatusInternalServerError)
+		LogAndErrorReturn(w, fmt.Errorf("failed to create directory: %v", err))
 		return
 	}
 
 	// Create a new file in the qdconfigs directory
 	tempFile, err := os.CreateTemp("qdconfigs", "config-*.json5")
 	if err != nil {
-		log.Printf("Failed to create qdconfigs directory: %v", err)
-		http.Error(w, "Failed to create temp file", http.StatusInternalServerError)
+		LogAndErrorReturn(w, fmt.Errorf("failed to create qdconfigs directory: %v", err))
 		return
 	}
 	defer tempFile.Close()
 
 	if len(fileContent) == 0 {
-		log.Printf("ERROR file content: %d\n", len(fileContent))
-		http.Error(w, "No file content. 0-length file.", http.StatusInternalServerError)
+		LogAndErrorReturn(w, fmt.Errorf("no file content. 0-length file"))
 		return
 	}
 
 	// Write the file content to the temp file
 	if _, err := tempFile.Write(fileContent); err != nil {
-		log.Printf("Failed to write file content: %v", err)
-		http.Error(w, "Failed to write file content", http.StatusInternalServerError)
+		LogAndErrorReturn(w, fmt.Errorf("failed to write file content: %v", err))
 		return
 	}
 
@@ -178,24 +284,21 @@ func handleNewSimulation(w http.ResponseWriter, r *http.Request, cmd *Command) {
 
 	sid, err := app.qm.InsertItem(queueItem)
 	if err != nil {
-		log.Printf("Failed to insert new item to database: %v", err)
-		http.Error(w, "Failed to insert queue item", http.StatusInternalServerError)
+		LogAndErrorReturn(w, fmt.Errorf("failed to insert new item to database: %v", err))
 		return
 	}
 
 	// Make the new directory
 	err = os.MkdirAll(fmt.Sprintf("qdconfigs/%d", sid), os.ModePerm)
 	if err != nil {
-		log.Printf("Failed to make directory qdconfigs/%d: %v", sid, err)
-		http.Error(w, "Failed to create directory", http.StatusInternalServerError)
+		LogAndErrorReturn(w, fmt.Errorf("failed to make directory qdconfigs/%d: %v", sid, err))
 		return
 	}
 
 	// Rename the file to include the queue item ID and original filename
 	newFilePath := fmt.Sprintf("qdconfigs/%d/%s", sid, req.OriginalFilename)
 	if err := os.Rename(tempFile.Name(), newFilePath); err != nil {
-		log.Printf("Failed to rename %s to %s: %v", tempFile.Name(), newFilePath, err)
-		http.Error(w, "Failed to rename file", http.StatusInternalServerError)
+		LogAndErrorReturn(w, fmt.Errorf("failed to rename %s to %s: %v", tempFile.Name(), newFilePath, err))
 		return
 	}
 
@@ -294,15 +397,13 @@ func handleDeleteItem(w http.ResponseWriter, r *http.Request, cmd *Command) {
 	// Delete the file and directory associated with the queue item
 	dirPath := fmt.Sprintf("qdconfigs/%d", req.SID)
 	if err := os.RemoveAll(dirPath); err != nil {
-		log.Printf("Failed to remove directory %s: %v", dirPath, err)
-		http.Error(w, "Failed to remove associated files", http.StatusInternalServerError)
+		LogAndErrorReturn(w, fmt.Errorf("failed to remove directory %s: %v", dirPath, err))
 		return
 	}
 
 	// Delete the queue item from the database
 	if err := app.qm.DeleteItem(req.SID); err != nil {
-		log.Printf("Failed to delete queue item %d: %v", req.SID, err)
-		http.Error(w, "Failed to delete queue item", http.StatusInternalServerError)
+		LogAndErrorReturn(w, fmt.Errorf("failed to delete queue item %d: %v", req.SID, err))
 		return
 	}
 

@@ -22,12 +22,19 @@ responsible for assigning them to compute resources that can run
 them and report back with the results. The compute resources can
 be a company server, or a cloud-based resource.  Simulations on
 company servers will be managed based on their capacity. Cloud-based
-servers will be managed based on cost. That is, the dispatcher will
-be given a budget for cloud based simulations.  The simulator can
-tell the dispatcher how long the simulation will take and provide
-updates during its run for accurate time predictions.  Based on its
-budget, and the cost of the cloud servers, the dispatcher will
-initiate cloud based simulations until it runs out of budget.
+servers will also be used once we begin fully utilizing the computers
+within our company.  Currently, a lot of computers sit idle during
+the nights and weekends. We want to use the SIMQ system to take
+advantage of all these idle compute resources to begin collecting
+results from the simulations we will run.  We will use a daemon,
+simd, to run on all the hardware that can be utilized for these
+simulations. Each simd can be configured to indicate when the
+computer it's running on can be used for simulations. When it becomes
+available, simd will contact the dispatcher for simulation(s) to run.
+Then simd will initiate the simulation(s). The simulator can tell
+contact the dispatcher directly to indicate how long the simulation
+will take and provide updates during its execution for accurate
+time predictions.
 
 Simulation jobs are added to a Queue by a client process (psq). The
 user must only supply the config file and CSV database file set (as
@@ -50,9 +57,9 @@ about them through use. The dispatcher will have a limit on the
 number of active cloud-based simulations it can have running at any
 given time. We will raise this limit over time as we assess the
 accuracy of the cost predictions and the reliabilty of the runs.
-The dispatcher will keep the company servers running as many simulations
-as they can. And when one simulation completes it will immediately
-start up a new one based on the priorities in the queue.
+The dispatcher will keep the company servers running as many
+simulations as they can. And when one simulation completes it will
+immediately start up a new one based on the priorities in the queue.
 
 For cloud based servers, we will pick a class of compute resource
 and adjust its capacity based on our experience.

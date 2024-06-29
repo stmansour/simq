@@ -44,10 +44,10 @@ EOF
 #       none
 #############################################################################
 pause() {
-	read -p "Press [Enter] to continue, M to move ${2} to gold/${2}.gold, Q or X to quit..." x
+	read -rp "Press [Enter] to continue, M to move ${2} to gold/${2}.gold, Q or X to quit..." x
 	x=$(echo "${x}" | tr "[:upper:]" "[:lower:]")
-	if [ "${x}" == "q" -o "${x}" == "x" ]; then
-		if [ ${MANAGESERVER} -eq 1 ]; then
+	if [ "${x}" == "q" ] || [ "${x}" == "x" ]; then
+		if [ "${MANAGESERVER}" -eq 1 ]; then
 			echo "STOPPING DISPATCHER"
 			pkill dispatcher
 		fi
@@ -68,8 +68,9 @@ is_json() {
 send_command() {
     local CMD=$1
     local DESCRIPTION=$2
+    local RESPONSE
     echo "Sending ${DESCRIPTION} command: curl -s -X POST http://localhost:8250/command -d \"${CMD}\" -H \"Content-Type: application/json\"" >> ${RESFILE}
-    local RESPONSE=$(curl -s -X POST http://localhost:8250/command -d "${CMD}" -H "Content-Type: application/json")
+    RESPONSE=$(curl -s -X POST http://localhost:8250/command -d "${CMD}" -H "Content-Type: application/json")
     echo "Response: ${RESPONSE}" >> serverresponse
     if is_json "${RESPONSE}"; then
         echo "${RESPONSE}" | jq . >> ${RESFILE}
@@ -81,11 +82,12 @@ send_command() {
 # Function to send command with file and log response
 #------------------------------------------------------------------------------
 send_command_with_file() {
+    local RESPONSE
     local DESCRIPTION=$1
     local CMD=$2
     local FILE=$3
     echo "Sending ${DESCRIPTION} command with file: curl -s -X POST http://localhost:8250/command -F \"command=NewSimulation\" -F \"username=test-user\" -F \"data=${CMD}\" -F \"file=@${FILE}\"" >> ${RESFILE}
-    local RESPONSE=$(curl -s -X POST http://localhost:8250/command -F "command=NewSimulation" -F "username=test-user" -F "data=${CMD}" -F "file=@${FILE}")
+    RESPONSE=$(curl -s -X POST http://localhost:8250/command -F "command=NewSimulation" -F "username=test-user" -F "data=${CMD}" -F "file=@${FILE}")
     echo "Response: ${RESPONSE}" >> serverresponse
     if is_json "${RESPONSE}"; then
         echo "${RESPONSE}" | jq . >> ${RESFILE}
@@ -259,11 +261,84 @@ if [[ "${SINGLETEST}${TFILES}" = "${TFILES}" || "${SINGLETEST}${TFILES}" = "${TF
     # Wait for the dispatcher to shutdown
     #---------------------------------------
     sleep 2
-    if ps -p ${DISPATCHER_PID} > /dev/null; then
+    if ps -p "${DISPATCHER_PID}" > /dev/null; then
         echo "Dispatcher still running after shutdown command" >> ${RESFILE}
     else
         echo "Dispatcher has shut down successfully" >> ${RESFILE}
+        DISPATCHER_RUNNING=0
     fi
+    compareToGold ${RESFILE}
+    ((TESTCOUNT++))
+fi
+
+#------------------------------------------------------------------------------
+#  TEST b
+#  book a simulation
+#------------------------------------------------------------------------------
+TFILES="b"
+STEP=0
+if [[ "${SINGLETEST}${TFILES}" = "${TFILES}" || "${SINGLETEST}${TFILES}" = "${TFILES}${TFILES}" ]]; then
+    startDispatcher
+    echo -n "Test ${TFILES} - Book a simulation... "
+
+    RESFILE="${TFILES}${STEP}"
+    echo "Result File: ${RESFILE}" > ${RESFILE}
+
+    #----------------------------------
+    # Create a new simulation
+    #----------------------------------
+    ADD_CMD='{"name":"Test Simulation","priority":5,"description":"A test simulation","url":"http://localhost:8080","OriginalFilename":"config.json5"}'
+    send_command_with_file "NewSimulation" "${ADD_CMD}" "config.json5"
+    sleep 2  # Small delay to ensure the command is processed
+
+    #----------------------------------
+    # Book the simulation
+    #----------------------------------
+    BOOK_CMD='{"command":"Book","username":"test-user","data":{"MachineID":"test-machine","CPUs":10,"Memory":"64GB","CPUArchitecture":"ARM64","Availability":"always"}}'
+    echo "Sending Book command: ${BOOK_CMD}" >> ${RESFILE}
+    RESPONSE=$(curl -s -X POST -H "Content-Type: application/json" -d "${BOOK_CMD}" http://localhost:8250/command)
+    sleep 1  # Ensure the response is fully captured
+
+    # Handle multipart response
+    BOUNDARY=$(echo "${RESPONSE}" | grep -o 'boundary=[^;]*' | cut -d '=' -f 2)
+    echo "${RESPONSE}" | awk -v boundary="${BOUNDARY}" -v resfile="${RESFILE}" -v tfiles="${TFILES}" '
+    BEGIN { RS="--"boundary; FS="\r\n\r\n" }
+    /Content-Disposition: form-data; name="json"/ {
+        print "JSON Response: "$2 >> resfile
+    }
+    /Content-Disposition: form-data; name="file"/ {
+        getline; getline;
+        filename = tfiles ".rcvd.config.json5"
+        print $0 > filename
+        print "Received config file part, saved as " filename >> resfile
+    }'
+    sleep 1
+
+    #----------------------------------
+    # Get the active queue and verify state
+    #----------------------------------
+    GET_QUEUE_CMD='{ "command": "GetActiveQueue", "username": "test-user" }'
+    send_command "${GET_QUEUE_CMD}" "GetActiveQueue"
+    sleep 1
+
+    #----------------------------------
+    # Shutdown the dispatcher
+    #----------------------------------
+    SHUTDOWN_CMD='{ "command": "Shutdown", "username": "test-user" }'
+    send_command "${SHUTDOWN_CMD}" "Shutdown"
+    sleep 2
+
+    #---------------------------------------
+    # Wait for the dispatcher to shutdown
+    #---------------------------------------
+    if ps -p "${DISPATCHER_PID}" > /dev/null; then
+        echo "Dispatcher still running after shutdown command" >> ${RESFILE}
+    else
+        echo "Dispatcher has shut down successfully" >> ${RESFILE}
+        DISPATCHER_RUNNING=0
+    fi
+
+    # Compare output to gold standard
     compareToGold ${RESFILE}
     ((TESTCOUNT++))
 fi

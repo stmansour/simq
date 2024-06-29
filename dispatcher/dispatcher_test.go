@@ -5,16 +5,23 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stmansour/simq/data"
 	"github.com/stmansour/simq/util"
 )
+
+func TestVersion(t *testing.T) {
+	app.version = true
+	doMain()
+}
 
 func initTest(t *testing.T) (*data.QueueManager, error) {
 	ex, err := util.ReadExternalResources()
@@ -37,6 +44,161 @@ func initTest(t *testing.T) (*data.QueueManager, error) {
 		return nil, err
 	}
 	return qm, nil
+}
+
+func TestBookCommand(t *testing.T) {
+	qm, err := initTest(t)
+	if err != nil {
+		t.Fatalf("Failed to initialize test: %v", err)
+	}
+	app.qm = qm
+
+	//-------------------------------------
+	// Read the config.json5 file
+	//-------------------------------------
+	fileContent, err := os.ReadFile("config.json5")
+	if err != nil {
+		t.Fatalf("Failed to read config file: %v", err)
+	}
+
+	createReq := CreateQueueEntryRequest{
+		OriginalFilename: "config.json5",
+		Name:             "Test Simulation",
+		Priority:         5,
+		Description:      "A test simulation",
+		URL:              "http://localhost:8080",
+	}
+	reqData, err := json.Marshal(createReq)
+	if err != nil {
+		t.Fatalf("Failed to marshal create request: %v", err)
+	}
+
+	//---------------------------------------
+	// Create a new multipart form request
+	//---------------------------------------
+	var b bytes.Buffer
+	w := multipart.NewWriter(&b)
+
+	w.WriteField("command", "NewSimulation")
+	w.WriteField("username", "test-user")
+	w.WriteField("data", string(reqData))
+
+	fw, err := w.CreateFormFile("file", "config.json5")
+	if err != nil {
+		t.Fatalf("Failed to create form file: %v", err)
+	}
+	if _, err := fw.Write(fileContent); err != nil {
+		t.Fatalf("Failed to write file content: %v", err)
+	}
+	w.Close()
+
+	req, err := http.NewRequest("POST", "/command", &b)
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
+	req.Header.Set("Content-Type", w.FormDataContentType())
+
+	rr := httptest.NewRecorder()
+	handler := http.HandlerFunc(commandDispatcher)
+	handler.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusCreated {
+		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusCreated)
+	}
+
+	//-------------------------------------
+	// Send the Book command
+	//-------------------------------------
+	cmd := Command{
+		Command:  "Book",
+		Username: "test-user",
+	}
+
+	cmdDataStruct := struct {
+		MachineID       string
+		CPUs            int
+		Memory          string
+		CPUArchitecture string
+		Availability    string
+	}{
+		MachineID:       "test-machine",
+		CPUs:            10,
+		Memory:          "64GB",
+		CPUArchitecture: "ARM64",
+		Availability:    "always",
+	}
+	dataBytes, err := json.Marshal(cmdDataStruct)
+	if err != nil {
+		t.Fatalf("Failed to marshal book request: %v", err)
+	}
+	cmd.Data = json.RawMessage(dataBytes)
+	bookData, err := json.Marshal(cmd)
+	if err != nil {
+		t.Fatalf("Failed to marshal book request: %v", err)
+	}
+
+	req, err = http.NewRequest("POST", "/command", bytes.NewBuffer(bookData))
+	if err != nil {
+		t.Fatalf("Failed to create book request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	rr = httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	// -------------------------------------
+	// READ BACK THE RESPONSE...
+	// -------------------------------------
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("handler returned wrong status code for Book command: got %v want %v", status, http.StatusOK)
+	}
+
+	var bookResp struct {
+		Status         string
+		SID            int64
+		ConfigFilename string
+	}
+
+	// Use a multipart reader to parse the response
+	boundary := strings.Split(rr.Header().Get("Content-Type"), "boundary=")[1]
+	multipartReader := multipart.NewReader(rr.Body, boundary)
+
+	for {
+		part, err := multipartReader.NextPart()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("Error reading multipart response: %v", err)
+		}
+
+		switch part.FormName() {
+		case "json":
+			// Decode the JSON part
+			if err := json.NewDecoder(part).Decode(&bookResp); err != nil {
+				t.Errorf("Failed to unmarshal book response: %v", err)
+			}
+		case "file":
+			// Write the file part
+			configDir := fmt.Sprintf("simulations/%d", bookResp.SID)
+			os.MkdirAll(configDir, os.ModePerm)
+			configPath := fmt.Sprintf("%s/%s", configDir, bookResp.ConfigFilename)
+
+			out, err := os.Create(configPath)
+			if err != nil {
+				t.Errorf("Failed to create config file: %v", err)
+			}
+			defer out.Close()
+			if _, err := io.Copy(out, part); err != nil {
+				t.Errorf("Failed to write config file: %v", err)
+			}
+		}
+	}
+
+	// Clean up the created file and directory
+	if err := os.RemoveAll(fmt.Sprintf("simulations/%d", bookResp.SID)); err != nil {
+		t.Errorf("Failed to clean up test files: %v", err)
+	}
 }
 
 func TestHandleNewSimulation(t *testing.T) {
