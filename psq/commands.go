@@ -12,26 +12,26 @@ import (
 
 // Command represents the structure of a command
 type Command struct {
-	Command  string          `json:"command"`
-	Username string          `json:"username"`
-	Data     json.RawMessage `json:"data"`
+	Command  string
+	Username string
+	Data     json.RawMessage
 }
 
 // CreateQueueEntryRequest represents the data for creating a queue entry
 type CreateQueueEntryRequest struct {
-	FileContent      string `json:"FileContent"`
-	OriginalFilename string `json:"OriginalFilename"`
-	Name             string `json:"name"`
-	Priority         int    `json:"priority"`
-	Description      string `json:"description"`
-	URL              string `json:"url"`
+	FileContent      string
+	OriginalFilename string
+	Name             string
+	Priority         int
+	Description      string
+	URL              string
 }
 
 // Config represents the structure of a config
 type Config struct {
-	SimulationName string `json:"SimulationName"`
-	C1             string `json:"C1"`
-	C2             string `json:"C2"`
+	SimulationName string
+	C1             string
+	C2             string
 }
 
 const (
@@ -51,7 +51,7 @@ func addJob(username, file string) {
 		Name:             config.SimulationName,
 		Priority:         defaultPriority,
 		Description:      "",
-		URL:              defaultURL,
+		URL:              "",
 	}
 
 	dataBytes, _ := json.Marshal(data)
@@ -95,15 +95,31 @@ func listJobs(username string) {
 		fmt.Printf("Error unmarshalling response: %v\n", err)
 		return
 	}
-
+	// 0         1         2         3         4         5         6
+	// 01234567890123456789012345678901234567890123456789
+	// 2024/05/11 HH:MM
+	fmt.Printf("SID PRI ST %-15s %-15s %-16s %-40s %-25s \n", "Username", "File", "Estimate", "MachineID", "Name")
 	for _, item := range resp.Data {
-		fmt.Printf("SID: %3d. Pri: %2d, St: %d, Name: %s, File: %s\n", item.SID, item.Priority, item.State, item.Name, item.File)
+		nm := item.Name
+		if len(nm) > 25 {
+			nm = nm[:24] + string(rune(0x2026))
+		}
+		mid := item.MachineID
+		if len(mid) > 40 {
+			mid = mid[:34] + string(rune(0x2026))
+		}
+		estimate := ""
+		if item.DtEstimate.Valid {
+			estimate = item.DtEstimate.Time.Format("2006/01/02 15:04")
+		}
+
+		fmt.Printf("%3d %3d %2d %-15s %-15s %-16s %-40s %-15s\n", item.SID, item.Priority, item.State, item.Username, item.File, estimate, mid, nm)
 	}
 }
 
 func deleteJob(username string, sid int64) {
 	data := struct {
-		SID int64 `json:"sid"`
+		SID int64
 	}{
 		SID: sid,
 	}

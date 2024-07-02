@@ -176,7 +176,7 @@ compareToGold() {
 #------------------------------------------------------------------------------
 startDispatcher() {
     if ((DISPATCHER_RUNNING == 0)); then
-        killall -9 dispatcher
+        killall -9 dispatcher >/dev/null 2>&1
 
         #-------------------------------------------------------
         # start a new dispatcher with a clean database table
@@ -186,7 +186,6 @@ startDispatcher() {
 
         ./dispatcher >DISPATCHER.log 2>&1 &
         DISPATCHER_PID=$!
-        echo "Started dispatcher with PID: ${DISPATCHER_PID}"
         sleep 2
         DISPATCHER_RUNNING=1
     fi

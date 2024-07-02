@@ -31,9 +31,11 @@ type QueueManager struct {
 type QueueItem struct {
 	SID         int64
 	File        string
+	Username    string
 	Name        string
 	Priority    int
 	Description string
+	MachineID   string
 	URL         string
 	State       int
 	DtEstimate  sql.NullTime
@@ -84,10 +86,12 @@ func (qm *QueueManager) EnsureSchemaExists() error {
 		`CREATE TABLE IF NOT EXISTS Queue (
 		SID BIGINT AUTO_INCREMENT PRIMARY KEY,
 		File VARCHAR(80) NOT NULL,
+		Username VARCHAR(40) NOT NULL,
 		Name VARCHAR(80) NOT NULL DEFAULT '',
 		Priority INT NOT NULL DEFAULT 5,
 		Description VARCHAR(256) NOT NULL DEFAULT '',
-		URL VARCHAR(80) NOT NULL,
+		MachineID VARCHAR(80) NOT NULL DEFAULT '',
+		URL VARCHAR(80) NOT NULL DEFAULT '',
 		State INT NOT NULL DEFAULT 0,
 		DtEstimate DATETIME,
 		DtCompleted DATETIME,
@@ -99,12 +103,12 @@ func (qm *QueueManager) EnsureSchemaExists() error {
 }
 
 // GetItemByID retrieves a queue item by its SID
-func (qm *QueueManager) GetItemByID(SID int) (QueueItem, error) {
+func (qm *QueueManager) GetItemByID(SID int64) (QueueItem, error) {
 	var item QueueItem
-	querySQL := `SELECT SID, File, Name, Priority, Description, URL, State, DtEstimate, DtCompleted, Created, Modified
+	querySQL := `SELECT SID, File, Username,Name, Priority, Description, MachineID, URL, State, DtEstimate, DtCompleted, Created, Modified
 				 FROM Queue WHERE SID = ?`
 	row := qm.db.QueryRow(querySQL, SID)
-	err := row.Scan(&item.SID, &item.File, &item.Name, &item.Priority, &item.Description, &item.URL, &item.State, &item.DtEstimate, &item.DtCompleted, &item.Created, &item.Modified)
+	err := row.Scan(&item.SID, &item.File, &item.Username, &item.Name, &item.Priority, &item.Description, &item.MachineID, &item.URL, &item.State, &item.DtEstimate, &item.DtCompleted, &item.Created, &item.Modified)
 	if err != nil {
 		return item, err
 	}
@@ -113,9 +117,9 @@ func (qm *QueueManager) GetItemByID(SID int) (QueueItem, error) {
 
 // InsertItem inserts an item into the queue
 func (qm *QueueManager) InsertItem(item QueueItem) (int64, error) {
-	insertSQL := `INSERT INTO Queue (File, Name, Priority, Description, URL, State, DtEstimate)
-				  VALUES (?, ?, ?, ?, ?, ?, ?)`
-	result, err := qm.db.Exec(insertSQL, item.File, item.Name, item.Priority, item.Description, item.URL, item.State, item.DtEstimate)
+	insertSQL := `INSERT INTO Queue (File, Username, Name, Priority, Description, URL, State, DtEstimate)
+				  VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+	result, err := qm.db.Exec(insertSQL, item.File, item.Username, item.Name, item.Priority, item.Description, item.URL, item.State, item.DtEstimate)
 	if err != nil {
 		return 0, err
 	}
@@ -124,14 +128,14 @@ func (qm *QueueManager) InsertItem(item QueueItem) (int64, error) {
 
 // UpdateItem updates an item in the queue
 func (qm *QueueManager) UpdateItem(item QueueItem) error {
-	updateSQL := `UPDATE Queue SET File = ?, Name = ?, Priority = ?, Description = ?, URL = ?, State = ?, DtEstimate = ?, DtCompleted = ?, Modified = CURRENT_TIMESTAMP
+	updateSQL := `UPDATE Queue SET File = ?, Username = ?, Name = ?, Priority = ?, Description = ?, MachineID = ?, URL = ?, State = ?, DtEstimate = ?, DtCompleted = ?, Modified = CURRENT_TIMESTAMP
 				  WHERE SID = ?`
-	_, err := qm.db.Exec(updateSQL, item.File, item.Name, item.Priority, item.Description, item.URL, item.State, item.DtEstimate, item.DtCompleted, item.SID)
+	_, err := qm.db.Exec(updateSQL, item.File, item.Username, item.Name, item.Priority, item.Description, item.MachineID, item.URL, item.State, item.DtEstimate, item.DtCompleted, item.SID)
 	return err
 }
 
 // DeleteItem deletes an item from the queue
-func (qm *QueueManager) DeleteItem(SID int) error {
+func (qm *QueueManager) DeleteItem(SID int64) error {
 	deleteSQL := `DELETE FROM Queue WHERE SID = ?`
 	_, err := qm.db.Exec(deleteSQL, SID)
 	return err
@@ -140,7 +144,7 @@ func (qm *QueueManager) DeleteItem(SID int) error {
 // GetQueuedAndExecutingItems returns all items in the queue
 func (qm *QueueManager) GetQueuedAndExecutingItems() ([]QueueItem, error) {
 	querySQL := `
-    SELECT SID, File, Name, Priority, Description, URL, State, DtEstimate, DtCompleted, Created, Modified
+    SELECT SID, File, Username, Name, Priority, Description, MachineID, URL, State, DtEstimate, DtCompleted, Created, Modified
     FROM Queue 
     WHERE State IN (0, 1, 2)
     ORDER BY 
@@ -165,7 +169,7 @@ func (qm *QueueManager) GetQueuedAndExecutingItems() ([]QueueItem, error) {
 	var items []QueueItem
 	for rows.Next() {
 		var item QueueItem
-		err := rows.Scan(&item.SID, &item.File, &item.Name, &item.Priority, &item.Description, &item.URL, &item.State, &item.DtEstimate, &item.DtCompleted, &item.Created, &item.Modified)
+		err := rows.Scan(&item.SID, &item.File, &item.Username, &item.Name, &item.Priority, &item.Description, &item.MachineID, &item.URL, &item.State, &item.DtEstimate, &item.DtCompleted, &item.Created, &item.Modified)
 		if err != nil {
 			return nil, err
 		}
@@ -180,10 +184,10 @@ func (qm *QueueManager) GetHighestPriorityQueuedItem() (QueueItem, error) {
 	var item QueueItem
 
 	// Query to select the highest priority queued item
-	query := `SELECT SID, File, Name, Priority, Description, URL, State, DtEstimate, DtCompleted, Created, Modified
+	query := `SELECT SID, File, Username, Name, Priority, Description, MachineID, URL, State, DtEstimate, DtCompleted, Created, Modified
 			  FROM Queue WHERE State = ? ORDER BY Priority ASC, SID ASC LIMIT 1`
 	row := qm.db.QueryRow(query, StateQueued)
-	err := row.Scan(&item.SID, &item.File, &item.Name, &item.Priority, &item.Description, &item.URL, &item.State, &item.DtEstimate, &item.DtCompleted, &item.Created, &item.Modified)
+	err := row.Scan(&item.SID, &item.File, &item.Username, &item.Name, &item.Priority, &item.Description, &item.MachineID, &item.URL, &item.State, &item.DtEstimate, &item.DtCompleted, &item.Created, &item.Modified)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return QueueItem{}, fmt.Errorf("no queued items found")

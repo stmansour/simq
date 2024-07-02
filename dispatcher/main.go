@@ -22,6 +22,8 @@ var app struct {
 	version       bool
 	shutdownwait  int
 	DispatcherURL string
+	HexASCIIDbg   bool // if true print reply buffers in hex and ASCII
+	HTTPHdrsDbg   bool // if true print HTTP headers
 }
 
 func readCommandLineArgs() {

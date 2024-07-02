@@ -140,7 +140,7 @@ func TestQueueManager(t *testing.T) {
 	}
 
 	// Delete the item
-	err = qm.DeleteItem(int(sid))
+	err = qm.DeleteItem(sid)
 	if err != nil {
 		t.Errorf("Failed to delete item: %v", err)
 	}
@@ -286,7 +286,7 @@ func TestGetItemByID(t *testing.T) {
 	}
 
 	// Retrieve the item by SID
-	retrievedItem, err := qm.GetItemByID(int(sid))
+	retrievedItem, err := qm.GetItemByID(sid)
 	if err != nil {
 		t.Errorf("Failed to retrieve item by ID: %v", err)
 		return
@@ -348,14 +348,14 @@ func TestDeleteItem(t *testing.T) {
 	}
 
 	// Delete the item
-	err = qm.DeleteItem(int(sid))
+	err = qm.DeleteItem(sid)
 	if err != nil {
 		t.Errorf("Failed to delete item: %v", err)
 		return
 	}
 
 	// Try to retrieve the deleted item
-	_, err = qm.GetItemByID(int(sid))
+	_, err = qm.GetItemByID(sid)
 	if err == nil {
 		t.Errorf("Expected error when retrieving deleted item, but got none")
 	}

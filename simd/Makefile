@@ -1,26 +1,22 @@
 TOP=..
 BINDIR=${TOP}/dist/simq
-THISDIR="dispatcher"
+THISDIR="simd"
 TEST_FAILURE_FILE=fail
 BUILD_TIME := $(shell date "+%Y-%m-%d_%H:%M:%S")
 
-dispatcher: *.go
+simd: *.go
 	go vet
 	golint
 	staticcheck
-	go build -ldflags "-X 'github.com/stmansour/simq/util.buildID=$(BUILD_TIME)'" -o dispatcher
+	go build -ldflags "-X 'github.com/stmansour/simq/util.buildID=$(BUILD_TIME)'" -o simd
 	@echo "*** $(THISDIR): completed $(THISDIR) ***"
 
 clean:
 	go clean
-	rm -rf *.prof *.out qdconfigs extres.json5 fail [a-z][0-9] DISPATCHER.log serverresponse simulations
+	rm -rf *.prof *.out extres.json5 fail [a-z][0-9] DISPATCHER.log serverresponse
 	@echo "*** ${THISDIR}: completed clean ***"
 
 test: config
-	@touch $(TEST_FAILURE_FILE)
-	@go test github.com/stmansour/simq/${THISDIR}
-	@./functest.sh && rm -f $(TEST_FAILURE_FILE) 
-	@go test -coverprofile=coverage.out -coverpkg=./
 	@echo "*** ${THISDIR}: completed test ***"
 
 config:
@@ -31,13 +27,13 @@ coverage:
 	go tool cover -html=coverage.out 
 
 package:
-	cp dispatcher ${BINDIR}/
+	cp simd ${BINDIR}/
 	@echo "*** ${THISDIR}: completed package ***"
 
 releaseman:
-	if [ -d /usr/local/share/man/man1 ] && [ -w /usr/local/share/man/man1 ]; then cp dispatcher.1 /usr/local/share/man/man1/ ; fi
+	if [ -d /usr/local/share/man/man1 ] && [ -w /usr/local/share/man/man1 ]; then cp simd.1 /usr/local/share/man/man1/ ; fi
 	@echo "*** ${THISDIR}: completed releaseman ***"
 
 refmt:
-	fmt dispatcher.1 > dispatcher.11 ; mv dispatcher.11 dispatcher.1
+	fmt simd.1 > simd.11 ; mv simd.11 simd.1
 

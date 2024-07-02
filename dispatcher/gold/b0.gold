@@ -1,10 +1,15 @@
-Result File: a0
+Result File: b0
 Sending NewSimulation command with file: curl -s -X POST http://localhost:8250/command -F "command=NewSimulation" -F "username=test-user" -F "data={"name":"Test Simulation","priority":5,"description":"A test simulation","url":"http://localhost:8080","OriginalFilename":"config.json5"}" -F "file=@config.json5"
 {
   "Status": "success",
   "Message": "Created queue item",
   "ID": 1
 }
+Sending Book command: {"command":"Book","username":"test-user","data":{"MachineID":"test-machine","CPUs":10,"Memory":"64GB","CPUArchitecture":"ARM64","Availability":"always"}}
+JSON Response: {"Status":"success","Message":"simulation booked","SID":1,"ConfigFilename":"config.json5"}
+
+
+Received config file part, saved as b.rcvd.config.json5
 Sending GetActiveQueue command: curl -s -X POST http://localhost:8250/command -d "{ "command": "GetActiveQueue", "username": "test-user" }" -H "Content-Type: application/json"
 {
   "Status": "success",
@@ -16,9 +21,9 @@ Sending GetActiveQueue command: curl -s -X POST http://localhost:8250/command -d
       "Name": "Test Simulation",
       "Priority": 5,
       "Description": "A test simulation",
-      "MachineID": "",
+      "MachineID": "test-machine",
       "URL": "http://localhost:8080",
-      "State": 0,
+      "State": 1,
       "DtEstimate": {
         "Time": "0001-01-01T00:00:00Z",
         "Valid": false
@@ -32,12 +37,9 @@ Sending GetActiveQueue command: curl -s -X POST http://localhost:8250/command -d
     }
   ]
 }
-Sending DeleteItem command: curl -s -X POST http://localhost:8250/command -d "{ "command": "DeleteItem", "username": "test-user", "data": { "sid": 1 } }" -H "Content-Type: application/json"
+Sending Shutdown command: curl -s -X POST http://localhost:8250/command -d "{ "command": "Shutdown", "username": "test-user" }" -H "Content-Type: application/json"
 {
   "Status": "success",
-  "Message": "deleted",
-  "ID": 1
+  "Message": "Shutting down"
 }
-Shutting down the server with command: { "command": "Shutdown", "username": "test-user" }
-Shutdown Response: {"Status":"success","Message":"Shutting down"}
 Dispatcher has shut down successfully

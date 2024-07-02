@@ -1,14 +1,16 @@
 package main
 
 import (
-	"bufio"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"os/user"
+	"path/filepath"
 	"strconv"
 	"strings"
 
+	"github.com/chzyer/readline"
 	"github.com/stmansour/simq/util"
 )
 
@@ -53,12 +55,40 @@ func main() {
 }
 
 func interactiveMode(username string) {
-	fmt.Printf("PSQ Version %s\nType 'help' for a list of commands.\n", util.Version())
-	reader := bufio.NewReader(os.Stdin)
+	usr, err := user.Current()
+	if err != nil {
+		log.Fatalf("Failed to get current user: %v", err)
+	}
+
+	historyFile := filepath.Join(usr.HomeDir, ".psq", "history")
+	err = os.MkdirAll(filepath.Dir(historyFile), os.ModePerm)
+	if err != nil {
+		log.Fatalf("Failed to create history directory: %v", err)
+	}
+
+	rl, err := readline.NewEx(&readline.Config{
+		Prompt:          "psq> ",
+		HistoryFile:     historyFile,
+		InterruptPrompt: "^C",
+		EOFPrompt:       "exit",
+	})
+	if err != nil {
+		log.Fatalf("Failed to initialize readline: %v", err)
+	}
+	defer rl.Close()
+
+	fmt.Printf("PSQ Version %s\nType 'help' for a command list, Up Arrow for previous command, and Down Arrow for next command.\n", util.Version())
+
 	for {
-		fmt.Print("psq> ")
-		input, _ := reader.ReadString('\n')
-		input = strings.TrimSpace(input)
+		line, err := rl.Readline()
+		if err != nil {
+			if err == readline.ErrInterrupt {
+				continue
+			}
+			break
+		}
+
+		input := strings.TrimSpace(line)
 		args := strings.Fields(input)
 		if len(args) == 0 {
 			continue

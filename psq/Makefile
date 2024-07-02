@@ -36,3 +36,5 @@ releaseman:
 refmt:
 	fmt dispatcher.1 > dispatcher.11 ; mv dispatcher.11 dispatcher.1
 
+release:
+	cp psq /usr/local/simq/bin/psq
