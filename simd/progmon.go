@@ -64,7 +64,7 @@ func startSimulator(sid int64, configFile string) error {
 	simDir := createFQDirName(cwd, []string{"simulations", fmt.Sprintf("%d", sid)})
 	cf := createFQFilename(simDir, configFile)
 
-	cmd := exec.Command("/usr/local/plato/bin/simulator", "-c", cf, "-SID", fmt.Sprintf("%d", sid))
+	cmd := exec.Command("/usr/local/plato/bin/simulator", "-c", cf, "-SID", fmt.Sprintf("%d", sid), "-DISPATCHER", app.cfg.DispatcherURL)
 	cmd.Dir = simDir // Set the working directory for the command
 
 	stdout, err := cmd.StdoutPipe()
@@ -121,6 +121,7 @@ func monitorSimulator(sim *Simulation) {
 				}
 			}
 		}
+		//
 	}()
 
 	// Create a ticker that triggers every 5 minutes

@@ -49,7 +49,7 @@ type SvcStatus200 struct {
 func bookAndRunSimulation() error {
 	cmd := Command{
 		Command:  "Book",
-		Username: "test-user",
+		Username: "simd",
 	}
 
 	cmdDataStruct := struct {

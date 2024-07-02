@@ -95,6 +95,7 @@ func listJobs(username string) {
 		fmt.Printf("Error unmarshalling response: %v\n", err)
 		return
 	}
+	states := []string{"Qd", "Bk", "Ex", "Fn", "Er"}
 	// 0         1         2         3         4         5         6
 	// 01234567890123456789012345678901234567890123456789
 	// 2024/05/11 HH:MM
@@ -113,7 +114,7 @@ func listJobs(username string) {
 			estimate = item.DtEstimate.Time.Format("2006/01/02 15:04")
 		}
 
-		fmt.Printf("%3d %3d %2d %-15s %-15s %-16s %-40s %-15s\n", item.SID, item.Priority, item.State, item.Username, item.File, estimate, mid, nm)
+		fmt.Printf("%3d %3d %2s %-15s %-15s %-16s %-40s %-15s\n", item.SID, item.Priority, states[item.State], item.Username, item.File, estimate, mid, nm)
 	}
 }
 

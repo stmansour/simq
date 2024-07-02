@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
 
 	"github.com/stmansour/simq/data"
@@ -31,13 +32,28 @@ func readCommandLineArgs() {
 	flag.Parse()
 }
 
-func doMain() {
+func setMyNetworkAddress() {
 	app.port = 8250
+	naddrs, err := util.GetNetworkInfo()
+	if err != nil {
+		log.Fatalf("Failed to get network info: %v", err)
+	}
+	for i := 0; i < len(naddrs); i++ {
+		if strings.Contains(naddrs[i].IPAddress, "127.0.0.1") {
+			continue
+		}
+		app.DispatcherURL = fmt.Sprintf("http://%s:%d/", naddrs[i].IPAddress, app.port)
+	}
+	log.Printf("Dispatcher Network Address: %s\n", app.DispatcherURL)
+}
+
+func doMain() {
 	ex, err := util.ReadExternalResources()
 	if err != nil {
 		log.Fatalf("Failed to read external resources: %v", err)
 	}
 	cmd := ex.GetSQLOpenString("simq")
+	setMyNetworkAddress()
 
 	app.qm, err = data.NewQueueManager(cmd)
 	if err != nil {
@@ -58,7 +74,6 @@ func doMain() {
 		app.shutdownwait = 5
 
 		go func() {
-			log.Println("Server is running on port", app.port)
 			if err := app.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 				log.Fatalf("ListenAndServe(): %v", err)
 			}

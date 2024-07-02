@@ -3,8 +3,10 @@ package main
 import (
 	"log"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/stmansour/simq/util"
 	"github.com/yosuke-furukawa/json5/encoding/json5"
 )
 
@@ -21,6 +23,7 @@ type SimdConfig struct {
 	CPUArchitecture string
 	Availability    string
 	DispatcherURL   string
+	SimdURL         string
 	MaxSimulations  int // maximum number of simulations this machine can run
 }
 
@@ -53,7 +56,24 @@ func main() {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
 
+	//-------------------------------------
+	// GET MY IP ADDRESS
+	//-------------------------------------
+	naddrs, err := util.GetNetworkInfo()
+	if err != nil {
+		log.Fatalf("Failed to get network info: %v", err)
+	}
+	for i := 0; i < len(naddrs); i++ {
+		if strings.Contains(naddrs[i].IPAddress, "127.0.0.1") {
+			continue
+		}
+		app.cfg.SimdURL = naddrs[i].IPAddress
+	}
+	log.Printf("SimdIP Address: %s\n", app.cfg.SimdURL)
+
+	//-------------------------------------
 	// Initial check and run is immediate
+	//-------------------------------------
 	if isAvailable() {
 		err := bookAndRunSimulation()
 		if err != nil {

@@ -428,7 +428,7 @@ func handleUpdateItem(w http.ResponseWriter, r *http.Request, d *HInfo) {
 		return
 	}
 
-	fmt.Printf("UpdateItem: %+v\n", req)
+	fmt.Printf("RECEIVED -UpdateItem: %+v\n", req)
 
 	//--------------------------------------------------------
 	// load the existing item to establish the base values
@@ -467,6 +467,7 @@ func handleUpdateItem(w http.ResponseWriter, r *http.Request, d *HInfo) {
 		}
 		queueItem.DtEstimate.Time = dt
 		queueItem.DtEstimate.Valid = true
+		queueItem.State = data.StateExecuting
 	}
 	if req.DtCompleted != z && len(req.DtCompleted) > 0 {
 		dt, err := util.StringToDate(req.DtCompleted)
@@ -476,6 +477,7 @@ func handleUpdateItem(w http.ResponseWriter, r *http.Request, d *HInfo) {
 		}
 		queueItem.DtCompleted.Time = dt
 		queueItem.DtCompleted.Valid = true
+		queueItem.State = data.StateCompleted
 	}
 
 	if err := app.qm.UpdateItem(queueItem); err != nil {
