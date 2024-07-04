@@ -16,10 +16,12 @@ const (
 	StateBooked = 1
 	// StateExecuting indicates that the  item is currently executing
 	StateExecuting = 2
-	// StateCompleted indicates that the item has completed execution
+	// StateCompleted indicates that the simulation has completed execution
 	StateCompleted = 3
+	// StateResultsSaved indicates that the simulation results have been saved
+	StateResultsSaved = 4
 	// StateError indicates that there was an error with the item
-	StateError = 4
+	StateError = 5
 )
 
 // QueueManager is a wrapper around the MySQL database

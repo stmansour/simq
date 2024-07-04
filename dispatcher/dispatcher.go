@@ -10,6 +10,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -45,6 +46,14 @@ type UpdateItemRequest struct {
 	DtCompleted string
 	CPUs        int
 	Memory      string
+}
+
+// EndSimulationRequest represents the data for ending a simulation
+type EndSimulationRequest struct {
+	Command  string
+	Username string
+	SID      int64  // simulation ID that has ended
+	Filename string // the tar.gz file that contains the results
 }
 
 // DeleteItemRequest represents the data for deleting a queue item
@@ -85,6 +94,7 @@ type HInfo struct {
 var handlerTable = map[string]HandlerTableEntry{
 	"Book":           {Handler: handleBook},
 	"DeleteItem":     {Handler: handleDeleteItem},
+	"EndSimulation":  {Handler: handleEndSimulation},
 	"GetActiveQueue": {Handler: handleGetActiveQueue},
 	"NewSimulation":  {Handler: handleNewSimulation},
 	"Shutdown":       {Handler: handleShutdown},
@@ -97,14 +107,19 @@ func LogAndErrorReturn(w http.ResponseWriter, err error) {
 	SvcErrorReturn(w, err)
 }
 
+// app.HTTPHdrsDbg = true
+// app.HexASCIIDbg = true
+
 // commandDispatcher dispatches commands to appropriate handlers
 // -----------------------------------------------------------------------------
 func commandDispatcher(w http.ResponseWriter, r *http.Request) {
 	var cmd Command
 	var ok bool
+	var d HInfo
 	h := HandlerTableEntry{}
-	var bodyBytes []byte
-	var err error
+
+	app.HTTPHdrsDbg = true
+	app.HexASCIIDbg = true
 
 	//------------------------------
 	// DEBUG
@@ -116,50 +131,156 @@ func commandDispatcher(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	//-------------------------------------------------
-	// Could be multipart, could be single part...
-	//-------------------------------------------------
-	if r.Header.Get("Content-Type") != "" && strings.Contains(r.Header.Get("Content-Type"), "multipart/form-data") {
-		//===============================================
-		// MULTIPART
-		//===============================================
+	// Check for Content-Type header
+	contentType := r.Header.Get("Content-Type")
+	if contentType == "" {
+		SvcErrorReturn(w, fmt.Errorf("missing Content-Type header in request"))
+		return
+	}
+
+	// Multipart request
+	if strings.Contains(contentType, "multipart/form-data") {
 		if err := r.ParseMultipartForm(10 << 20); err != nil {
-			SvcErrorReturn(w, fmt.Errorf("failed to parse multipart form"))
+			SvcErrorReturn(w, fmt.Errorf("failed to parse multipart form: %v", err))
 			return
 		}
 
-		cmd.Command = r.FormValue("command")
-		cmd.Username = r.FormValue("username")
-		dataPart := r.FormValue("data")
-		cmd.Data = json.RawMessage(dataPart)
-
+		// Extract the data part
+		dataField := r.FormValue("data")
+		if dataField == "" {
+			SvcErrorReturn(w, fmt.Errorf("missing data field in multipart request"))
+			return
+		}
+		d.BodyBytes = []byte(dataField)
+		if err := json.Unmarshal([]byte(dataField), &cmd); err != nil {
+			SvcErrorReturn(w, fmt.Errorf("invalid data payload in multipart request: %v", err))
+			return
+		}
 	} else {
-		//===============================================
-		// SINGLE-PART
-		//===============================================
-		bodyBytes, err = io.ReadAll(r.Body)
+		// Single-part request - unmarshal directly
+		bodyBytes, err := io.ReadAll(r.Body)
 		if err != nil {
-			SvcErrorReturn(w, fmt.Errorf("failed to read request body"))
+			SvcErrorReturn(w, fmt.Errorf("failed to read request body: %v", err))
 			return
 		}
 		if app.HexASCIIDbg {
 			PrintHexAndASCII(bodyBytes, 256)
 		}
 		if err := json.Unmarshal(bodyBytes, &cmd); err != nil {
-			SvcErrorReturn(w, fmt.Errorf("invalid request payload"))
+			SvcErrorReturn(w, fmt.Errorf("invalid request payload: %v", err))
 			return
 		}
+
+		// Store the raw body bytes
+		d.BodyBytes = bodyBytes
 	}
 
-	d := HInfo{BodyBytes: bodyBytes, cmd: &cmd}
+	//---------------------------------------------------------------------------
+	// Define d with the unmarshalled cmd struct and BodyBytes (if applicable)
+	//---------------------------------------------------------------------------
+	d.cmd = &cmd
+
+	// DEBUGGING...
 	log.Printf("\tcommand: %s, username: %s", cmd.Command, cmd.Username)
 
-	if h, ok = handlerTable[cmd.Command]; !ok {
-		LogAndErrorReturn(w, fmt.Errorf("unknown command: %s", cmd.Command))
+	h, ok = handlerTable[cmd.Command]
+	if !ok {
+		// Shouldn't happen, but handle for safety
+		log.Printf("Internal Error: handler not found for command: %s", cmd.Command)
 		return
 	}
 
 	h.Handler(w, r, &d)
+}
+
+// handleEndSimulation handles the EndSimulation command.
+//
+//	The request body contains:
+//	Cmd
+//	    Command - the command, EndSimulation
+//	    Username - the person or process making this call
+//	    Data
+//	        SID - the ID of the simulation
+//	        Filename - the name of the tar.gz file
+//
+// ---------------------------------------------------------------------------
+func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) { // Include d *HInfo
+	var cmd EndSimulationRequest
+
+	if err := json.Unmarshal(d.BodyBytes, &cmd); err != nil {
+		SvcErrorReturn(w, fmt.Errorf("invalid end simulation request data"))
+		return
+	}
+
+	fmt.Printf("EndSimulation: SID: %d, Filename: %s\n", cmd.SID, cmd.Filename)
+
+	//----------------------------------------------------------------------------
+	// the results file must be stored in the simulations results directory:
+	// /opt/simulation-results/YYYY/MM/DD/SID/results.tar.gz
+	//----------------------------------------------------------------------------
+	now := time.Now()
+	year := now.Year()
+	month := now.Month()
+	day := now.Day()
+	dirPath := filepath.Join("/opt", "simulation-results",
+		fmt.Sprintf("%d", year),
+		fmt.Sprintf("%d", month),
+		fmt.Sprintf("%d", day),
+		fmt.Sprintf("%d", cmd.SID),
+	)
+	filename := filepath.Join(dirPath, cmd.Filename)
+
+	// Create directories if they don't exist
+	if err := os.MkdirAll(dirPath, os.ModePerm); err != nil {
+		SvcErrorReturn(w, fmt.Errorf("failed to create directory: %v", err))
+		return
+	}
+	//------------------------------
+	// Get the file from the form
+	//------------------------------
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		SvcErrorReturn(w, fmt.Errorf("failed to get file from form"))
+		return
+	}
+	defer file.Close()
+	fileContent, err := io.ReadAll(file)
+	if err != nil {
+		SvcErrorReturn(w, fmt.Errorf("failed to read file content"))
+		return
+	}
+
+	tarz, err := os.Create(filename)
+	if err != nil {
+		LogAndErrorReturn(w, fmt.Errorf("failed to create file %s: %v", filename, err))
+		return
+	}
+	defer tarz.Close()
+	if len(fileContent) == 0 {
+		LogAndErrorReturn(w, fmt.Errorf("no file content. 0-length file"))
+		return
+	}
+	//----------------------------------------------
+	// Write the tar.gz file
+	//----------------------------------------------
+	if _, err := tarz.Write(fileContent); err != nil {
+		LogAndErrorReturn(w, fmt.Errorf("failed to write file content: %v", err))
+		return
+	}
+
+	//------------------------------
+	// SEND RESPONSE
+	//------------------------------
+	w.WriteHeader(http.StatusOK)
+	resp := struct {
+		Status  string
+		Message string
+	}{
+		Status:  "success",
+		Message: "Results stored in: " + dirPath,
+	}
+	SvcWriteResponse(w, &resp)
+
 }
 
 // handleBook handles the Book command
@@ -265,68 +386,64 @@ func handleBook(w http.ResponseWriter, r *http.Request, d *HInfo) {
 // It creates a new entry in the queue
 // ---------------------------------------------------------------------------
 func handleNewSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
-	// Parse the multipart form data
-	if err := r.ParseMultipartForm(10 << 20); err != nil {
-		LogAndErrorReturn(w, fmt.Errorf("failed to parse multipart form: %v", err))
-		return
-	}
-
-	// Get the command data part
-	dataPart := r.FormValue("data")
-	if dataPart == "" {
-		SvcErrorReturn(w, fmt.Errorf("missing command data part"))
-		return
-	}
-
+	//-----------------------------------------------------------
 	// Unmarshal the command data into CreateQueueEntryRequest
+	//-----------------------------------------------------------
 	var req CreateQueueEntryRequest
-	if err := json.Unmarshal([]byte(dataPart), &req); err != nil {
+	if err := json.Unmarshal(d.cmd.Data, &req); err != nil {
 		SvcErrorReturn(w, fmt.Errorf("failed to unmarshal request data"))
 		return
 	}
 
+	//------------------------------
 	// Get the file from the form
+	//------------------------------
 	file, _, err := r.FormFile("file")
 	if err != nil {
 		SvcErrorReturn(w, fmt.Errorf("failed to get file from form"))
 		return
 	}
 	defer file.Close()
-
-	// Read the file content
 	fileContent, err := io.ReadAll(file)
 	if err != nil {
 		SvcErrorReturn(w, fmt.Errorf("failed to read file content"))
 		return
 	}
 
+	//----------------------------------------------
 	// Create the directory if it doesn't exist
+	//----------------------------------------------
 	err = os.MkdirAll("qdconfigs", os.ModePerm)
 	if err != nil {
 		LogAndErrorReturn(w, fmt.Errorf("failed to create directory: %v", err))
 		return
 	}
 
+	//----------------------------------------------
 	// Create a new file in the qdconfigs directory
+	//----------------------------------------------
 	tempFile, err := os.CreateTemp("qdconfigs", "config-*.json5")
 	if err != nil {
 		LogAndErrorReturn(w, fmt.Errorf("failed to create qdconfigs directory: %v", err))
 		return
 	}
 	defer tempFile.Close()
-
 	if len(fileContent) == 0 {
 		LogAndErrorReturn(w, fmt.Errorf("no file content. 0-length file"))
 		return
 	}
 
-	// Write the file content to the temp file
+	//----------------------------------------------
+	// Write the file content to a TEMPORARY file
+	//----------------------------------------------
 	if _, err := tempFile.Write(fileContent); err != nil {
 		LogAndErrorReturn(w, fmt.Errorf("failed to write file content: %v", err))
 		return
 	}
 
+	//----------------------------------------------
 	// Insert the queue item
+	//----------------------------------------------
 	queueItem := data.QueueItem{
 		File:        req.OriginalFilename,
 		Username:    d.cmd.Username,
@@ -336,27 +453,33 @@ func handleNewSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 		URL:         req.URL,
 		State:       data.StateQueued,
 	}
-
 	sid, err := app.qm.InsertItem(queueItem)
 	if err != nil {
 		LogAndErrorReturn(w, fmt.Errorf("failed to insert new item to database: %v", err))
 		return
 	}
 
+	//----------------------------------------------
 	// Make the new directory
+	//----------------------------------------------
 	err = os.MkdirAll(fmt.Sprintf("qdconfigs/%d", sid), os.ModePerm)
 	if err != nil {
 		LogAndErrorReturn(w, fmt.Errorf("failed to make directory qdconfigs/%d: %v", sid, err))
 		return
 	}
 
+	//---------------------------------------------------------------------
 	// Rename the file to include the queue item ID and original filename
+	//---------------------------------------------------------------------
 	newFilePath := fmt.Sprintf("qdconfigs/%d/%s", sid, req.OriginalFilename)
 	if err := os.Rename(tempFile.Name(), newFilePath); err != nil {
 		LogAndErrorReturn(w, fmt.Errorf("failed to rename %s to %s: %v", tempFile.Name(), newFilePath, err))
 		return
 	}
 
+	//--------------------
+	// Send back SUCCESS
+	//--------------------
 	msg := SvcStatus201{
 		Status:  "success",
 		Message: "Created queue item",
@@ -496,7 +619,6 @@ func handleUpdateItem(w http.ResponseWriter, r *http.Request, d *HInfo) {
 
 // handleDeleteItem handles the DeleteItem command
 // -----------------------------------------------------------------------------
-// handleDeleteItem handles the DeleteItem command
 func handleDeleteItem(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	var req DeleteItemRequest
 	if err := json.Unmarshal(d.cmd.Data, &req); err != nil {

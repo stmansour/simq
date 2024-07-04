@@ -25,6 +25,7 @@ var app struct {
 	DispatcherURL string
 	HexASCIIDbg   bool // if true print reply buffers in hex and ASCII
 	HTTPHdrsDbg   bool // if true print HTTP headers
+	SimResultsDir string
 }
 
 func readCommandLineArgs() {
@@ -59,6 +60,8 @@ func doMain() {
 	if err != nil {
 		log.Fatalf("Failed to initialize queue manager: %v", err)
 	}
+
+	app.SimResultsDir = "/opt/simulation-results"
 
 	srvAddr := fmt.Sprintf(":%d", app.port)
 	mux := http.NewServeMux()

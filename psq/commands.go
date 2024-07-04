@@ -61,7 +61,10 @@ func addJob(username, file string) {
 		Data:     json.RawMessage(dataBytes),
 	}
 
-	resp := sendMultipartRequest(cmd, file)
+	resp, err := sendMultipartRequest(cmd, file)
+	if err != nil {
+		fmt.Printf("Error sending request: %v\n", err)
+	}
 	if resp != nil {
 		fmt.Printf("Add Job Response: %s\n", string(resp))
 	}

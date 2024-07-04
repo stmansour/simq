@@ -1,7 +1,9 @@
 package main
 
 import (
+	"archive/tar"
 	"bufio"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -18,12 +20,11 @@ import (
 type Simulation struct {
 	Cmd        *exec.Cmd
 	SID        int64
+	Directory  string
 	MachineID  string
 	URL        string
 	ConfigFile string
-	PID        int
 	LastStatus SimulatorStatus
-	stdout     io.ReadCloser
 }
 
 func createFQCWD() (string, error) {
@@ -53,6 +54,7 @@ func createFQFilename(cwd string, fname string) string {
 
 // Start the simulator with given SID and config file
 func startSimulator(sid int64, configFile string) error {
+	fmt.Printf("Starting simulation %d\n", sid)
 	//-------------------------------------------------------------
 	// Start the simulator
 	// Simulator needs to run in ./simulator/<sid>/
@@ -61,101 +63,162 @@ func startSimulator(sid int64, configFile string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get current working directory: %v", err)
 	}
-	simDir := createFQDirName(cwd, []string{"simulations", fmt.Sprintf("%d", sid)})
-	cf := createFQFilename(simDir, configFile)
+	Directory := createFQDirName(cwd, []string{"simulations", fmt.Sprintf("%d", sid)})
+	cf := createFQFilename(Directory, configFile)
+	logFile := filepath.Join(Directory, "sim.log")
 
-	cmd := exec.Command("/usr/local/plato/bin/simulator", "-c", cf, "-SID", fmt.Sprintf("%d", sid), "-DISPATCHER", app.cfg.DispatcherURL)
-	cmd.Dir = simDir // Set the working directory for the command
+	cmd := exec.Command("nohup", "/usr/local/plato/bin/simulator",
+		"-c", cf,
+		"-SID", fmt.Sprintf("%d", sid),
+		"-DISPATCHER", app.cfg.DispatcherURL)
+	//----------------------------------------------
+	// Set the working directory for the command
+	//----------------------------------------------
+	cmd.Dir = Directory
 
-	stdout, err := cmd.StdoutPipe()
+	//----------------------------------------------
+	// Redirect stdout and stderr to the log file
+	//----------------------------------------------
+	outputFile, err := os.Create(logFile)
 	if err != nil {
-		return fmt.Errorf("failed to get stdout pipe: %v", err)
+		return fmt.Errorf("failed to create log file: %v", err)
 	}
+	cmd.Stdout = outputFile
+	cmd.Stderr = outputFile
 
+	//----------------------------------------------
+	// Start the process
+	//----------------------------------------------
 	if err := cmd.Start(); err != nil {
+		outputFile.Close()
 		return fmt.Errorf("failed to start simulator: %v", err)
 	}
 
+	fmt.Printf("simulator started\n")
+
+	//----------------------------------------------
+	// Detach the process. We don't want it to stop
+	// if this process exits or dies
+	//----------------------------------------------
+	if err := cmd.Process.Release(); err != nil {
+		return fmt.Errorf("failed to detach simulator process: %v", err)
+	}
+	outputFile.Close()
+
+	fmt.Printf("simulator released\n")
+
+	//---------------------------------------------------------------
 	// we have a new simulation in process. Add it to the list...
+	//---------------------------------------------------------------
 	sm := Simulation{
-		SID:    sid,
-		PID:    cmd.Process.Pid,
-		Cmd:    cmd,
-		stdout: stdout,
+		SID:       sid,
+		Directory: Directory,
+		Cmd:       cmd,
 	}
 	app.sims = append(app.sims, sm)
 
+	//---------------------------------------------------------------
+	// Monitor the simulator process
+	//---------------------------------------------------------------
 	go monitorSimulator(&sm)
+
 	return nil
 }
 
 // Monitor the simulator process
 func monitorSimulator(sim *Simulation) {
-	triggers := []string{
-		"ERROR",
-		"WARNING",
-		"PANIC",
-		"INVALID",
-		"FORMATER",
+	//-------------------------------------------------------------
+	// First thing to do is get the first line of its log file.
+	// But let's wait 3 seconds to give it time to startup
+	//-------------------------------------------------------------
+	time.Sleep(3 * time.Second)
+	firstLine, err := getFirstLineOfLog(sim.Directory)
+	if err != nil {
+		log.Printf("Failed to get first line of log file: %v", err)
+		return
 	}
-	// Read the stdout for port information and other status
-	scanner := bufio.NewScanner(sim.stdout)
-	go func() {
-		for scanner.Scan() {
-			line := scanner.Text()
-			log.Printf("Simulator output: %s", line)
+	//-------------------------------------------------------------------------------
+	// the first line looks like this: "Simtalk address: http://192.168.1.180:8090"
+	// We need to extract the URL from that string
+	//-------------------------------------------------------------------------------
+	startIndex := strings.Index(firstLine, "http://")
+	if startIndex == -1 {
+		fmt.Println("No HTTP address found")
+		return
+	}
+	sim.URL = firstLine[startIndex:]
 
-			for _, trigger := range triggers {
-				if strings.Contains(line, trigger) {
-					log.Printf("")
-					return
-				}
-			}
-
-			// look for network address
-			if strings.Contains(line, "net address:") {
-				// parse out the network address
-				sa := strings.Split(line, " ")
-				if len(sa) >= 3 && !strings.Contains(sa[2], "127.0.0.1") {
-					sim.URL = sa[2]
-				}
-			}
-		}
-		//
-	}()
-
+	//-------------------------------------------------------------
 	// Create a ticker that triggers every 5 minutes
-	ticker := time.NewTicker(5 * time.Minute)
+	//-------------------------------------------------------------
+	//ticker := time.NewTicker(5 * time.Minute)
+	ticker := time.NewTicker(1 * time.Minute) // delete this after debugging
 	defer ticker.Stop()
 
+	//-------------------------------------------------------------
 	// Periodically ping the simulator to check its status
+	//-------------------------------------------------------------
 	for range ticker.C {
 		if !sim.isSimulatorRunning() {
-			log.Printf("Simulator with PID %d is no longer running", sim.PID)
-			reportFailure()
-			return
+			log.Printf("Simulator @ %s is no longer running", sim.URL)
+			break
 		}
-		status, err := getSimulatorStatus()
-		if err != nil {
-			log.Printf("Failed to get simulator status: %v", err)
-			reportFailure()
-			return
-		}
-		log.Printf("Simulator status: %+v", status)
 	}
+	//-------------------------------------------------------------
+	// Simulator has finished. Verify status with dispatcher. If
+	// all is well, then transmit files to the dispatcher
+	//-------------------------------------------------------------
+	fmt.Printf("Simulator @ %s is no longer running.\n", sim.URL)
+	if err = sim.archiveSimulationResults(); err != nil {
+		log.Printf("Failed to archive simulation results: %v", err)
+		return
+	}
+	fmt.Printf("Archived simulation results to %s\n", sim.Directory)
+
+	//-----------------------------------------
+	// Send the results to the dispatcher
+	//-----------------------------------------
+	if err = sim.sendEndSimulationRequest(); err != nil {
+		log.Printf("Failed to send end simulation request: %v", err)
+		return
+	}
+}
+
+func getFirstLineOfLog(Directory string) (string, error) {
+	filePath := filepath.Join(Directory, "sim.log")
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to open log file: %w", err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	if scanner.Scan() {
+		return scanner.Text(), nil
+	}
+
+	if err := scanner.Err(); err != nil {
+		return "", fmt.Errorf("error reading log file: %w", err)
+	}
+
+	return "", fmt.Errorf("log file is empty")
 }
 
 // Check if the simulator process is still running
 func (sim *Simulation) isSimulatorRunning() bool {
-	resp, err := http.Get(fmt.Sprintf("%s/status", sim.URL))
+	url := fmt.Sprintf("%s/status", sim.URL)
+	resp, err := http.Get(url)
 	if err != nil {
 		log.Printf("failed to get simulator status: %v", err)
+		return false
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Printf("error reading response body: %v", err)
+		return false
 	}
 	if resp.StatusCode != http.StatusOK {
 		log.Printf("server returned error status: %s", resp.Status)
@@ -164,28 +227,97 @@ func (sim *Simulation) isSimulatorRunning() bool {
 	err = json.Unmarshal(body, &status)
 	if err != nil {
 		log.Printf("error unmarshaling response body: %v", err)
+		return false
 	}
-	fmt.Printf("Simulator estimates completion: %s\n", status.EstimatedCompletion)
 	return true
-
 }
 
-// Get the status of the simulator
-func getSimulatorStatus() (*SimulatorStatus, error) {
-	resp, err := http.Get("http://localhost:port/status")
+// archiveSimulationResults adds all the files we care in the simulation directory
+// to a tar.gz file
+// -----------------------------------------------------------------------------------
+func (sim *Simulation) archiveSimulationResults() error {
+	//------------------------------------
+	// Save the current working directory
+	//------------------------------------
+	originalDir, err := os.Getwd()
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("failed to get current directory: %w", err)
 	}
-	defer resp.Body.Close()
 
-	var status SimulatorStatus
-	if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
-		return nil, err
+	//------------------------------------
+	// Change to the simulation directory
+	//------------------------------------
+	err = os.Chdir(sim.Directory)
+	if err != nil {
+		return fmt.Errorf("failed to change to simulation directory: %w", err)
 	}
-	return &status, nil
+
+	//------------------------------------------------------------------
+	// Ensure we change back to the original directory when we're done
+	//------------------------------------------------------------------
+	defer os.Chdir(originalDir)
+
+	//---------------------------------------------------------------------------------
+	// Create the output file in the current directory (which is now sim.Directory)
+	//---------------------------------------------------------------------------------
+	outFile, err := os.Create("results.tar.gz")
+	if err != nil {
+		return fmt.Errorf("failed to create archive file: %w", err)
+	}
+	defer outFile.Close()
+
+	gzWriter := gzip.NewWriter(outFile)
+	defer gzWriter.Close()
+
+	tarWriter := tar.NewWriter(gzWriter)
+	defer tarWriter.Close()
+
+	//---------------------------------------------------------------
+	// Search for the files that matter and add them to the archive
+	//---------------------------------------------------------------
+	patterns := []string{"*.json5", "*.csv", "*.log"} // Define file patterns to archive
+	for _, pattern := range patterns {
+		matches, err := filepath.Glob(pattern)
+		if err != nil {
+			return fmt.Errorf("failed to find files matching pattern %s: %w", pattern, err)
+		}
+
+		for _, filePath := range matches {
+			err = addFileToTar(tarWriter, filePath)
+			if err != nil {
+				return fmt.Errorf("failed to add file %s to archive: %w", filePath, err)
+			}
+		}
+	}
+
+	return nil
 }
 
-// Report failure to the dispatcher
-func reportFailure() {
-	// Implement reporting failure to dispatcher
+// addFileToTar adds a file to a tar.gz archive
+// ----------------------------------------------------------------------------
+func addFileToTar(tarWriter *tar.Writer, filePath string) error {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	info, err := file.Stat()
+	if err != nil {
+		return err
+	}
+
+	header, err := tar.FileInfoHeader(info, info.Name())
+	if err != nil {
+		return err
+	}
+	header.Name = filePath // This will be the name without any directory prefix
+
+	err = tarWriter.WriteHeader(header)
+	if err != nil {
+		return err
+	}
+
+	_, err = io.Copy(tarWriter, file)
+	return err
 }

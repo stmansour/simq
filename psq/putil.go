@@ -33,65 +33,64 @@ func sendRequest(cmd Command) []byte {
 	return body
 }
 
-func sendMultipartRequest(cmd Command, filePath string) []byte {
+func sendMultipartRequest(cmd Command, filePath string) ([]byte, error) {
 	var b bytes.Buffer
 	writer := multipart.NewWriter(&b)
 
-	// Add command part
-	_ = writer.WriteField("command", cmd.Command)
+	// Marshal the Command struct
+	cmdBytes, err := json.Marshal(cmd)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal command: %v", err)
+	}
 
-	// Add username part
-	_ = writer.WriteField("username", cmd.Username)
-
-	// Add data part
-	dataBytes, _ := json.Marshal(cmd.Data)
-	_ = writer.WriteField("data", string(dataBytes))
+	// Create the JSON part
+	part, err := writer.CreateFormField("data")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create form field: %v", err)
+	}
+	_, err = part.Write(cmdBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to write command data: %v", err)
+	}
 
 	// Add file part
 	file, err := os.Open(filePath)
 	if err != nil {
-		fmt.Printf("Error opening file: %v\n", err)
-		return nil
+		return nil, fmt.Errorf("error opening file: %v", err)
 	}
 	defer file.Close()
 
-	part, err := writer.CreateFormFile("file", filepath.Base(filePath))
+	part, err = writer.CreateFormFile("file", filepath.Base(filePath))
 	if err != nil {
-		fmt.Printf("Error creating form file: %v\n", err)
-		return nil
+		return nil, fmt.Errorf("failed to create form file: %v", err)
 	}
 	_, err = io.Copy(part, file)
 	if err != nil {
-		fmt.Printf("Error copying file content: %v\n", err)
-		return nil
+		return nil, fmt.Errorf("error copying file content: %v", err)
 	}
 
 	writer.Close()
 
 	req, err := http.NewRequest("POST", defaultURL, &b)
 	if err != nil {
-		fmt.Printf("Error creating request: %v\n", err)
-		return nil
+		return nil, fmt.Errorf("error creating request: %v", err)
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Printf("Error sending request: %v\n", err)
-		return nil
+		return nil, fmt.Errorf("error sending request: %v", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		fmt.Printf("Received non-OK HTTP status: %s\n", resp.Status)
-		return nil
+		return nil, fmt.Errorf("received non-OK HTTP status: %s", resp.Status)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Printf("Error reading response: %v\n", err)
-		return nil
+		return nil, fmt.Errorf("error reading response: %v", err)
 	}
-	return body
+	return body, nil
 }
