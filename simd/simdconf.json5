@@ -1,0 +1,19 @@
+// Mac:
+//  system_profiler SPHardwareDataType
+//  sysctl -n machdep.cpu.brand_string
+//  sysctl -n hw.ncpu
+//
+// Linux:
+//  lscpu
+//  nproc
+//
+// Windows:
+//  wmic cpu get name,NumberOfCores,NumberOfLogicalProcessors,MaxClockSpeed
+//  systeminfo | findstr /C:"Processor"
+{
+    "CPUs": 10,
+    "Memory": "64GB",
+    "CPUArchitecture": "ARM",
+    "MaxSimulations": 1,
+    "DispatcherURL": "http://192.168.1.180:8250/"
+}

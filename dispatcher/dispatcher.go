@@ -10,6 +10,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -215,7 +216,7 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) { // 
 	fmt.Printf("EndSimulation: SID: %d, Filename: %s\n", cmd.SID, cmd.Filename)
 
 	//----------------------------------------------------------------------------
-	// the results file must be stored in the simulations results directory:
+	// BUILD THE DESTINATION DIRECTORY
 	// /opt/simulation-results/YYYY/MM/DD/SID/results.tar.gz
 	//----------------------------------------------------------------------------
 	now := time.Now()
@@ -230,14 +231,17 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) { // 
 	)
 	filename := filepath.Join(dirPath, cmd.Filename)
 
-	// Create directories if they don't exist
+	//--------------------------------------------------
+	// CREATE THE FULL PATH
+	//--------------------------------------------------
 	if err := os.MkdirAll(dirPath, os.ModePerm); err != nil {
 		SvcErrorReturn(w, fmt.Errorf("failed to create directory: %v", err))
 		return
 	}
-	//------------------------------
-	// Get the file from the form
-	//------------------------------
+
+	//----------------------------------------------------
+	// EXTRACT THE FILE CONTENT
+	//----------------------------------------------------
 	file, _, err := r.FormFile("file")
 	if err != nil {
 		SvcErrorReturn(w, fmt.Errorf("failed to get file from form"))
@@ -250,6 +254,9 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) { // 
 		return
 	}
 
+	//----------------------------------------------
+	// CREATE THE TAR.GZ FILE
+	//----------------------------------------------
 	tarz, err := os.Create(filename)
 	if err != nil {
 		LogAndErrorReturn(w, fmt.Errorf("failed to create file %s: %v", filename, err))
@@ -260,11 +267,63 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) { // 
 		LogAndErrorReturn(w, fmt.Errorf("no file content. 0-length file"))
 		return
 	}
+
 	//----------------------------------------------
-	// Write the tar.gz file
+	// WRITE THE TAR.GZ FILE
 	//----------------------------------------------
 	if _, err := tarz.Write(fileContent); err != nil {
 		LogAndErrorReturn(w, fmt.Errorf("failed to write file content: %v", err))
+		return
+	}
+
+	//----------------------------------------------
+	// EXTRACT THE FILES FROM THE TAR.GZ FILE
+	//----------------------------------------------
+	originalDir, err := os.Getwd() // Save the current directory
+	if err != nil {
+		log.Fatalf("failed to get current directory: %v", err)
+	}
+	err = os.Chdir(dirPath) // Change to the target directory
+	if err != nil {
+		log.Fatalf("failed to change directory to %s: %v", dirPath, err)
+	}
+	tcmd := exec.Command("tar", "xzf", "results.tar.gz") // Execute the tar command
+	tcmd.Stdout = os.Stdout
+	tcmd.Stderr = os.Stderr
+	err = tcmd.Run()
+	if err != nil {
+		log.Fatalf("failed to execute tar command: %v", err)
+	}
+	err = os.Chdir(originalDir) // Return back to the original directory
+	if err != nil {
+		log.Fatalf("failed to change back to the original directory: %v", err)
+	}
+
+	//----------------------------
+	// REMOVE THE TAR.GZ FILE
+	//----------------------------
+	if err := os.Remove(filename); err != nil {
+		SvcErrorReturn(w, fmt.Errorf("failed to remove config file"))
+		return
+	}
+
+	//--------------------------------------------------------
+	// UPDATE THE STATE OF THIS ITEM - RESULTS SAVED
+	//--------------------------------------------------------
+	queueItem, err := app.qm.GetItemByID(cmd.SID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			SvcErrorReturn(w, fmt.Errorf("queue item %d not found", cmd.SID))
+		} else {
+			SvcErrorReturn(w, fmt.Errorf("error in GetItemByID: %v", err))
+		}
+		return
+	}
+
+	queueItem.State = data.StateResultsSaved
+
+	if err := app.qm.UpdateItem(queueItem); err != nil {
+		SvcErrorReturn(w, fmt.Errorf("error in UpdateItem: %v", err))
 		return
 	}
 
@@ -280,7 +339,6 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) { // 
 		Message: "Results stored in: " + dirPath,
 	}
 	SvcWriteResponse(w, &resp)
-
 }
 
 // handleBook handles the Book command
@@ -324,7 +382,7 @@ func handleBook(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	}
 
 	//-----------------------------------------------------------------------------
-	// Create the response
+	// Create the MULTIPARTresponse
 	//-----------------------------------------------------------------------------
 	response := BookedResponse{
 		Status:         "success",
@@ -332,10 +390,6 @@ func handleBook(w http.ResponseWriter, r *http.Request, d *HInfo) {
 		SID:            queueItem.SID,
 		ConfigFilename: "config.json5",
 	}
-
-	//-------------------------
-	// multipart writer
-	//-------------------------
 	multipartWriter := multipart.NewWriter(w)
 	w.Header().Set("Content-Type", multipartWriter.FormDataContentType())
 
@@ -551,7 +605,7 @@ func handleUpdateItem(w http.ResponseWriter, r *http.Request, d *HInfo) {
 		return
 	}
 
-	fmt.Printf("RECEIVED -UpdateItem: %+v\n", req)
+	// fmt.Printf("RECEIVED -UpdateItem: %+v\n", req)
 
 	//--------------------------------------------------------
 	// load the existing item to establish the base values

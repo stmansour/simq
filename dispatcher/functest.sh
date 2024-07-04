@@ -55,7 +55,6 @@ pause() {
     fi
 }
 
-
 # Function to check if a string is valid JSON
 #------------------------------------------------------------------------------
 is_json() {
@@ -69,7 +68,7 @@ send_command() {
     local CMD=$1
     local DESCRIPTION=$2
     local RESPONSE
-    echo "Sending ${DESCRIPTION} command: curl -s -X POST http://localhost:8250/command -d \"${CMD}\" -H \"Content-Type: application/json\"" >> ${RESFILE}
+    echo "Sending ${DESCRIPTION} command: curl -s -X POST http://localhost:8250/command -d '${CMD}' -H 'Content-Type: application/json'" >> ${RESFILE}
     RESPONSE=$(curl -s -X POST http://localhost:8250/command -d "${CMD}" -H "Content-Type: application/json")
     echo "Response: ${RESPONSE}" >> serverresponse
     if is_json "${RESPONSE}"; then
@@ -82,12 +81,20 @@ send_command() {
 # Function to send command with file and log response
 #------------------------------------------------------------------------------
 send_command_with_file() {
-    local RESPONSE
     local DESCRIPTION=$1
     local CMD=$2
     local FILE=$3
-    echo "Sending ${DESCRIPTION} command with file: curl -s -X POST http://localhost:8250/command -F \"command=NewSimulation\" -F \"username=test-user\" -F \"data=${CMD}\" -F \"file=@${FILE}\"" >> ${RESFILE}
-    RESPONSE=$(curl -s -X POST http://localhost:8250/command -F "command=NewSimulation" -F "username=test-user" -F "data=${CMD}" -F "file=@${FILE}")
+    local RESPONSE
+
+    # Compose the full command
+    CMD_FULL=$(jq -n --argjson data "${CMD}" \
+        '{command: "NewSimulation", username: "test-user", data: $data}')
+
+    # Encode CMD_FULL as a string to include in the curl command
+    CMD_FULL_STR=$(echo "${CMD_FULL}" | jq -c .)
+
+    echo "Sending ${DESCRIPTION} command with file: curl -s -X POST http://localhost:8250/command -F 'data=${CMD_FULL_STR}' -F 'file=@${FILE}'" >> ${RESFILE}
+    RESPONSE=$(curl -s -X POST http://localhost:8250/command -F "data=${CMD_FULL_STR}" -F "file=@${FILE}")
     echo "Response: ${RESPONSE}" >> serverresponse
     if is_json "${RESPONSE}"; then
         echo "${RESPONSE}" | jq . >> ${RESFILE}
@@ -95,7 +102,6 @@ send_command_with_file() {
         echo "${RESPONSE}" >> ${RESFILE}
     fi
 }
-
 
 #------------------------------------------------------------------------------
 # Function to compare a report file to its gold standard
@@ -243,7 +249,7 @@ if [[ "${SINGLETEST}${TFILES}" = "${TFILES}" || "${SINGLETEST}${TFILES}" = "${TF
 
     #----------------------------------
     # Delete the simulation
-    #---------------------------------- 
+    #----------------------------------
     DELETE_CMD='{ "command": "DeleteItem", "username": "test-user", "data": { "sid": 1 } }'
     send_command "${DELETE_CMD}" "DeleteItem"
     sleep 1

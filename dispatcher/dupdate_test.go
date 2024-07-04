@@ -29,7 +29,7 @@ func createTestRequest(t *testing.T, data map[string]interface{}) (*httptest.Res
 		Command:  "UpdateItem",
 		Username: "test-user",
 	}
-	cmd.Data = json.RawMessage(dataBytes) // RawMessage means that json.Marshal will not re-encode the data
+	cmd.Data = json.RawMessage(dataBytes) // RawMessage --> json.Marshal will not re-encode the data
 	jsonData, err := json.Marshal(cmd)
 	require.NoError(t, err)
 
@@ -63,7 +63,9 @@ func TestHandleUpdateItem(t *testing.T) {
 	app.HTTPHdrsDbg = true
 	app.HexASCIIDbg = true
 
-	// Setup: Create a test item in the database
+	//--------------------------------------
+	// CREATE A NEW ITEM IN THE DATABASE
+	//--------------------------------------
 	baseItem := data.QueueItem{
 		File:        "test.file",
 		Username:    "testuser",
@@ -92,7 +94,7 @@ func TestHandleUpdateItem(t *testing.T) {
 	//===================================================================
 	t.Run("UpdateAllFields", func(t *testing.T) {
 		//--------------------------------------------------
-		// Prepare the details of the request and send it
+		// PREPARE THE REQUEST DATA
 		//--------------------------------------------------
 		data := map[string]interface{}{
 			"SID":         sid,
@@ -106,7 +108,7 @@ func TestHandleUpdateItem(t *testing.T) {
 		rr, req := createTestRequest(t, data)
 
 		//--------------------------------------------------
-		// review what the handler returned
+		// SEND THE REQUEST AND VERIFY THE RESPONSE
 		//--------------------------------------------------
 		bodyBytes, err := io.ReadAll(rr.Body)
 		require.NoError(t, err)
@@ -121,8 +123,7 @@ func TestHandleUpdateItem(t *testing.T) {
 		assert.Equal(t, sid, response.ID)
 
 		//--------------------------------------------------
-		// Now, read this item back from the DB and verify
-		// that all the fields were updated
+		// VERIFY THE DATABASE WAS CORRECTLY UPDATED
 		//--------------------------------------------------
 		updatedItem, err := app.qm.GetItemByID(sid)
 		assert.NoError(t, err)
@@ -155,7 +156,9 @@ func TestHandleUpdateItem(t *testing.T) {
 		assert.Equal(t, "Updated", response.Message)
 		assert.Equal(t, sid, response.ID)
 
-		// Verify the update
+		//--------------------------------------------
+		// VERIFY THE DATABSE WAS CORRECTLY UPDATED
+		//--------------------------------------------
 		updatedItem, err := app.qm.GetItemByID(sid)
 		assert.NoError(t, err)
 		assert.Equal(t, 3, updatedItem.Priority)

@@ -1,5 +1,5 @@
 Result File: b0
-Sending NewSimulation command with file: curl -s -X POST http://localhost:8250/command -F "command=NewSimulation" -F "username=test-user" -F "data={"name":"Test Simulation","priority":5,"description":"A test simulation","url":"http://localhost:8080","OriginalFilename":"config.json5"}" -F "file=@config.json5"
+Sending NewSimulation command with file: curl -s -X POST http://localhost:8250/command -F 'data={"command":"NewSimulation","username":"test-user","data":{"name":"Test Simulation","priority":5,"description":"A test simulation","url":"http://localhost:8080","OriginalFilename":"config.json5"}}' -F 'file=@config.json5'
 {
   "Status": "success",
   "Message": "Created queue item",
@@ -10,7 +10,7 @@ JSON Response: {"Status":"success","Message":"simulation booked","SID":1,"Config
 
 
 Received config file part, saved as b.rcvd.config.json5
-Sending GetActiveQueue command: curl -s -X POST http://localhost:8250/command -d "{ "command": "GetActiveQueue", "username": "test-user" }" -H "Content-Type: application/json"
+Sending GetActiveQueue command: curl -s -X POST http://localhost:8250/command -d '{ "command": "GetActiveQueue", "username": "test-user" }' -H 'Content-Type: application/json'
 {
   "Status": "success",
   "Data": [
@@ -37,7 +37,7 @@ Sending GetActiveQueue command: curl -s -X POST http://localhost:8250/command -d
     }
   ]
 }
-Sending Shutdown command: curl -s -X POST http://localhost:8250/command -d "{ "command": "Shutdown", "username": "test-user" }" -H "Content-Type: application/json"
+Sending Shutdown command: curl -s -X POST http://localhost:8250/command -d '{ "command": "Shutdown", "username": "test-user" }' -H 'Content-Type: application/json'
 {
   "Status": "success",
   "Message": "Shutting down"
