@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -67,10 +68,11 @@ func startSimulator(sid int64, configFile string) error {
 	cf := createFQFilename(Directory, configFile)
 	logFile := filepath.Join(Directory, "sim.log")
 
-	cmd := exec.Command("nohup", "/usr/local/plato/bin/simulator",
+	cmd := exec.Command("/usr/local/plato/bin/simulator",
 		"-c", cf,
 		"-SID", fmt.Sprintf("%d", sid),
 		"-DISPATCHER", app.cfg.DispatcherURL)
+
 	//----------------------------------------------
 	// Set the working directory for the command
 	//----------------------------------------------
@@ -85,6 +87,15 @@ func startSimulator(sid int64, configFile string) error {
 	}
 	cmd.Stdout = outputFile
 	cmd.Stderr = outputFile
+
+	//----------------------------------------------
+	// Detach the process. We don't want it to stop
+	// if this process exits or dies
+	//----------------------------------------------
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Setpgid: true,
+		Pgid:    0,
+	}
 
 	//----------------------------------------------
 	// Start the process
@@ -115,7 +126,6 @@ func startSimulator(sid int64, configFile string) error {
 		Directory: Directory,
 		Cmd:       cmd,
 	}
-
 	app.sims = append(app.sims, sm)
 
 	//---------------------------------------------------------------

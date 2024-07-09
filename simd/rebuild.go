@@ -1,0 +1,436 @@
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+
+	"github.com/stmansour/simq/data"
+	"github.com/stmansour/simq/util"
+)
+
+// RebuildSimulatorList the simulator list for this machine.  This is called
+// when simd starts and makes the assumption that simd may have been killed
+// or crashed or shut down irregularly in some way. This will rebuild
+// the list of jobs it needs to see through.
+// -----------------------------------------------------------------------------
+func RebuildSimulatorList() error {
+	var err error
+	//----------------------------------------------------------------------
+	// DOES DISPATCHER HAVE ANY "IN-PROGRESS" SIMULATIONS FOR THIS MACHINE?
+	//----------------------------------------------------------------------
+	cmd := util.Command{
+		Command:  "GetMachineQueue",
+		Username: "simd",
+	}
+	var cmdDataStruct struct {
+		MachineID string
+	}
+	cmdDataStruct.MachineID, err = util.GetMachineUUID()
+	if err != nil {
+		return fmt.Errorf("failed to get machine ID: %v", err)
+	}
+	dataBytes, err := json.Marshal(cmdDataStruct)
+	if err != nil {
+		return fmt.Errorf("failed to marshal book request: %v", err)
+	}
+	cmd.Data = json.RawMessage(dataBytes)
+	url := fmt.Sprintf("%scommand", app.cfg.DispatcherURL)
+	body := util.SendRequest(url, &cmd)
+
+	//-----------------------------------------------------------
+	// UNMARSHAL THE RESPONSE.  This gives us the list of jobs
+	// that the dispatcher thinks we're working on...
+	//-----------------------------------------------------------
+	resp := struct {
+		Status string
+		Data   []data.QueueItem
+	}{}
+	err = json.Unmarshal(body, &resp)
+	if err != nil {
+		if strings.Contains(err.Error(), "unexpected end of JSON input") {
+			fmt.Printf("dispatcher has no jobs currently pending on this machine\n")
+			return nil
+		}
+		fmt.Printf("Error unmarshaling response: %v\n", err)
+	}
+
+	//-----------------------------------------------------------------
+	// ARE THERE ANY SIMULATIONS IN THE SIMULATION DIRECTORY?
+	// simd keeps its simulations in ./simulations/<SID>
+	//-----------------------------------------------------------------
+	type DIR struct {
+		Dir          string
+		InDispatcher bool
+	}
+	var dirs []DIR
+	dirPath := "./simulations"
+	dir, err := os.ReadDir(dirPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, entry := range dir {
+		if entry.IsDir() {
+			var d = DIR{
+				Dir:          entry.Name(),
+				InDispatcher: false,
+			}
+			fmt.Println(entry.Name())
+			dirs = append(dirs, d)
+		}
+	}
+
+	//------------------
+	// DEBUG
+	//------------------
+	if len(dirs) > 0 {
+		fmt.Printf("SIMD: dispatcher reports %d simulations belonging to this machine\n", len(dirs))
+		for i := 0; i < len(resp.Data); i++ {
+			fmt.Printf("sid: %d\n", resp.Data[i].SID)
+		}
+		fmt.Printf("SIMD: found these directories SID simulation directories\n")
+		for i := 0; i < len(dirs); i++ {
+			fmt.Printf("%s ", dirs[i].Dir)
+		}
+		fmt.Printf("\n")
+	}
+
+	//---------------------------------------------------------------------------
+	// WHAT JOBS IN THE SIMULATION DIRECTORY WERE ALSO LISTED BY THE DISPATCHER?
+	//---------------------------------------------------------------------------
+	for i := 0; i < len(resp.Data); i++ {
+		for j := 0; j < len(dirs); j++ {
+			sid, err := strconv.ParseInt(dirs[j].Dir, 10, 64)
+			if err != nil {
+				continue // not a number
+			}
+			if resp.Data[i].SID == sid {
+				fmt.Printf("Found simulation to recover: %d\n", resp.Data[i].SID)
+				dirs[j].InDispatcher = true // this dispatcher simulation is in our simulations directory
+				break
+			}
+		}
+	}
+
+	//---------------------------------------------------------------------
+	// DELETE THE SIMULATIONS IN THE SIMULATION DIRECTORY THAT ARE NOT IN
+	// THE DISPATCHER LIST.  The dispatcher may have given up on us and
+	// rebooked the simulation with another machine. There may be other
+	// ways for this to happen, but in any case, if there are simulations
+	// in our local directory that are not in the dispatcher list, we can
+	// delete them.
+	//---------------------------------------------------------------------
+	for i := 0; i < len(dirs); i++ {
+		if !dirs[i].InDispatcher {
+			log.Printf("Deleting simulation not found in dispatcher: %s\n", dirs[i].Dir)
+			os.RemoveAll(fmt.Sprintf("./simulations/%s", dirs[i].Dir))
+		}
+	}
+
+	//-------------------------------------------------------------------------
+	// ANALYZE AND TRY TO RECOVER THE REMAINING ITEMS IN THE DISPATCHER'S LIST
+	//-------------------------------------------------------------------------
+	for i := 0; i < len(resp.Data); i++ {
+		switch resp.Data[i].State {
+		case data.StateBooked:
+			recoverBookedSimulation(&resp.Data[i])
+		case data.StateExecuting:
+			recoverExecutingSimulation(&resp.Data[i])
+		case data.StateCompleted:
+			recoverArchiveSimResults(&resp.Data[i])
+		}
+	}
+
+	return nil
+}
+
+// recoverExecutingSimulation - In this case, the simulation was booked and
+// the simulator was executing enough to get that first message to dispatcher
+// which put it into the Executing state.  We need to either re-attach to the
+// existing simulator or restart it.
+// ------------------------------------------------------------------------------
+func recoverExecutingSimulation(qi *data.QueueItem) {
+	fmt.Printf("simd >>>> attempting to recover an executing simulation, sid = %d\n", qi.SID)
+	//----------------------------------------------
+	// IS THE SIMULATOR FOR THIS JOB STILL RUNNING?
+	//----------------------------------------------
+	sim := buildSimFromQueueItem(qi)
+	if sim.FindRunningSimulator() {
+		fmt.Printf("simd >>>> recovered running simulator for sid = %d\n", sim.SID)
+		return
+	}
+
+	//---------------------------------------------------------------------------
+	// UNFORTUNATELY, THE SIMULATOR IS NOT RUNNING. NEXT THING IS TO CHECK AND
+	// SEE IF IT FINISHED. HAVE A LOOK AT THE FILES IN ITS DIRECTORY
+	//---------------------------------------------------------------------------
+	if recovered, err := sim.recoverBasedOnFiles(); err != nil || recovered {
+		return // error occurred and logged
+	}
+
+	//----------------------------------------------------------------
+	// IF THE FILES ARE NOT THERE, WE NEED TO RESTART THE SIMULATOR
+	//----------------------------------------------------------------
+	fmt.Printf("simd >>>> rebooking sid = %d\n", sim.SID)
+	bookAndRunSimulation("Rebook", sim.SID)
+}
+
+// recoverArchiveSimResults - In this case, the simulation finished but
+// the results were not archived. Attempt to archive them
+// -----------------------------------------------------------------------
+func recoverArchiveSimResults(qi *data.QueueItem) {
+	sim := buildSimFromQueueItem(qi)
+	fmt.Printf("simd >>>> attempting to recover an archived simulation results, sid = %d\n", qi.SID)
+	configs, err := findJSON5Files(sim.Directory)
+	if err != nil {
+		log.Printf("Simulation: %d - error occurred lookng for config file in %s: error: %v\n", qi.SID, sim.Directory, err)
+		return
+	}
+
+	//---------------------------------------------------------
+	// If there is no config file, we can try to rerun it
+	//---------------------------------------------------------
+	if len(configs) == 0 {
+		log.Printf("Simulation for SID: %d - Missing config file in directory: %s\n", qi.SID, sim.Directory)
+		log.Printf("Rebooking...\n")
+		bookAndRunSimulation("Rebook", qi.SID)
+		return
+	}
+
+	//---------------------------------------------------------
+	// otherwise take the first config file found
+	//---------------------------------------------------------
+	if len(configs) > 1 {
+		log.Printf("Simulation for SID: %d - More than one config file in directory: %s\n", qi.SID, sim.Directory)
+		log.Printf("Unclear how to handle this case, so we're bailing out (ignoring it)\n")
+		return
+	}
+
+	sim.ConfigFile = configs[0]
+	app.sims = append(app.sims, sim)
+
+	if err = sim.sendEndSimulationRequest(); err != nil {
+		log.Printf("Failed to send end simulation request: %v", err)
+		return
+	}
+}
+
+// recoverBookedSimulation - In this case, the simulation was booked but
+// we never go the simulator started.  Try to recover.
+// -------------------------------------------------------------------------
+func recoverBookedSimulation(qi *data.QueueItem) {
+	var sim Simulation
+	fmt.Printf("simd >>>> attempting to recover a booked simulation, sid = %d\n", qi.SID)
+	//-----------------------------------------
+	// FIRST, DO WE HAVE THE CONFIG FILE
+	// Check for the existence of a file ending in .json5
+	// in ./simulations/<SID>
+	//-----------------------------------------
+	directory := fmt.Sprintf("./simulations/%d", qi.SID)
+	configs, err := findJSON5Files(directory)
+	if err != nil {
+		log.Printf("Simulation: %d - error occurred lookng for config file in %s: error: %v\n", qi.SID, directory, err)
+		return
+	}
+
+	//---------------------------------------------------
+	// IF WE DID NOT FIND ANY CONFIG FILES, REBOOK
+	//---------------------------------------------------
+	if len(configs) == 0 {
+		log.Printf("Simulation for SID: %d - Missing config file in directory: %s\n", qi.SID, directory)
+		log.Printf("Rebooking...\n")
+		bookAndRunSimulation("Rebook", qi.SID)
+		return
+	}
+
+	//------------------------------------------------------------------------
+	// If we have a config file, then we can do a lot. First, we can create
+	// enough of a simulation object to use many of its methods...
+	//------------------------------------------------------------------------
+	sim.SID = qi.SID
+	sim.Directory = directory
+	sim.ConfigFile = configs[0]
+
+	//---------------------------------------------------------------
+	// Next, we check for the existence of a "finrep.csv" file. If
+	// it exists, then the simulation completed, but the results were
+	// not archived. Try to archive them now...
+	//---------------------------------------------------------------
+	if recovered, err := sim.recoverBasedOnFiles(); err != nil || recovered {
+		return // error occurred and logged
+	}
+
+	//-----------------------------------------------------------------------
+	// No finrep.csv file found. So, either the simulation is still running
+	// or the simulator was terminated before the simulation completed.
+	// First check to make, see if the simulation is still running. It does
+	// not matter if there is a sim.log file in the directory. The process
+	// may still be running or it may have died. We don't know. But, either
+	// either way we will need to try to contact the running simulator if it
+	// is still running. If it's not running, we'll need to restart it. If
+	// it is running, we just need to monitor it.
+	//-----------------------------------------------------------------------
+	if sim.FindRunningSimulator() {
+		return // found the simulator!!
+	}
+
+	//----------------------------------------------------------------
+	// If we get here, then there is no running simulator assigned to
+	// this simulation. So, we need to restart the simulator
+	//----------------------------------------------------------------
+	bookAndRunSimulation("Rebook", sim.SID)
+}
+
+// recoverBasedOnFiles - If the file in the simulation directory indicate that
+// the simulation is done, then archive the results.
+// ------------------------------------------------------------------------------
+func (sim *Simulation) recoverBasedOnFiles() (bool, error) {
+	filenames, err := getFilenamesInDir(sim.Directory)
+	if err != nil {
+		log.Printf("Simulation: %d - error occurred lookng for config file in %s: error: %v\n", sim.SID, sim.Directory, err)
+		return false, err
+	}
+	for i := 0; i < len(filenames); i++ {
+		if strings.Contains(filenames[i], "finrep.csv") {
+			if err = sim.archiveSimulationResults(); err != nil {
+				log.Printf("Simulation: %d - error occurred archiving results: error: %v\n", sim.SID, err)
+				return false, err
+			}
+			if err = sim.sendEndSimulationRequest(); err != nil {
+				log.Printf("Simulation: %d - error occurred sending end request: error: %v\n", sim.SID, err)
+				return false, err
+			}
+			log.Printf("Successfully archived results for simulation: %d\n", sim.SID)
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+// FindRunningSimulator - Search for a running simulator that belongs to this simulation
+// If it finds the simulator running it will return true. Otherwise it returns false
+// --------------------------------------------------------------------------------
+func (sim *Simulation) FindRunningSimulator() bool {
+	//-------------------------------
+	// SEARCH ALL POSSIBLE PORTS
+	//-------------------------------
+	for port := 8090; port <= 8100; port++ {
+		url := fmt.Sprintf("http://127.0.0.1:%d/status", port)
+		sid, foundSID, err := FetchSID(url)
+		if err != nil {
+			if strings.Contains(err.Error(), "connect: connection refused") {
+				log.Printf("nothing listening on port %d", port)
+				continue
+			}
+			log.Printf("Error searching for sid on port %d: %v", port, err)
+			continue
+		}
+		if foundSID && sim.SID == sid {
+			//----------------------------------------------------
+			// FOUND IT!!!
+			// The simulator is still running.  Save the URL
+			// and continue to monitor it as usual
+			//----------------------------------------------------
+			log.Printf("REBUILD: Found running simulator for SID = %d on port %d\n", sim.SID, port)
+			sim.URL = url
+			go monitorSimulator(sim)
+			return true
+		}
+	}
+	return false
+}
+
+// FetchSID sends a request to the provided URL and extracts the "SID" field if it exists.
+func FetchSID(url string) (int64, bool, error) {
+	// Send the HTTP request
+	resp, err := http.Get(url)
+	if err != nil {
+		return 0, false, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Check for a successful response code
+	if resp.StatusCode != http.StatusOK {
+		return 0, false, fmt.Errorf("received non-200 response code: %d", resp.StatusCode)
+	}
+
+	// Read the response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return 0, false, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	// Unmarshal the JSON into a map
+	var result map[string]interface{}
+	err = json.Unmarshal(body, &result)
+	if err != nil {
+		return 0, false, fmt.Errorf("failed to unmarshal JSON: %w", err)
+	}
+
+	// Extract the "SID" field
+	sid, ok := result["SID"].(float64) // JSON numbers are unmarshalled as float64
+	if !ok {
+		return 0, false, nil // "SID" not present or not a number
+	}
+
+	return int64(sid), true, nil
+}
+
+func findJSON5Files(directory string) ([]string, error) {
+	var files []string
+	err := filepath.Walk(directory, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		if filepath.Ext(path) == ".json5" {
+			files = append(files, path)
+		}
+		return nil
+	})
+	return files, err
+}
+
+func getFilenamesInDir(dirPath string) ([]string, error) {
+	dir, err := os.Open(dirPath)
+	if err != nil {
+		return nil, err
+	}
+	defer dir.Close()
+
+	fileInfos, err := dir.Readdir(-1)
+	if err != nil {
+		return nil, err
+	}
+
+	var filenames []string
+	for _, fileInfo := range fileInfos {
+		if !fileInfo.IsDir() {
+			filenames = append(filenames, fileInfo.Name())
+		}
+	}
+
+	return filenames, nil
+}
+
+// buildSimFromQueueItem - create as much of the Simulation struct as possible
+// based on the information in the queue item.
+// ------------------------------------------------------------------------------
+func buildSimFromQueueItem(qi *data.QueueItem) Simulation {
+	sim := Simulation{
+		SID:        qi.SID,
+		Directory:  fmt.Sprintf("./simulations/%d", qi.SID),
+		ConfigFile: qi.File,
+	}
+
+	return sim
+}

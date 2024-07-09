@@ -13,7 +13,7 @@ simd: *.go
 
 clean:
 	go clean
-	rm -rf *.prof *.out extres.json5 fail [a-z][0-9] DISPATCHER.log serverresponse config.json5 simulations
+	rm -rf *.prof *.out extres.json5 fail [a-z][0-9] DISPATCHER.log serverresponse config.json5 simulations finrep.csv simstats.csv
 	@echo "*** ${THISDIR}: completed clean ***"
 
 test: config
