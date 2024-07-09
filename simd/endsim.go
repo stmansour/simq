@@ -106,5 +106,23 @@ func (sim *Simulation) sendEndSimulationRequest() error {
 		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
+	//------------------------------------
+	// REMOVE THE SIMULATION DIRECTORY
+	//------------------------------------
+	err = os.RemoveAll(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to remove directory: %w", err)
+	}
+
+	//--------------------------------------
+	// REMOVE THE SIMULATION FROM APP.SIMS
+	//--------------------------------------
+	for i, s := range app.sims {
+		if s.SID == sim.SID {
+			app.sims = append(app.sims[:i], app.sims[i+1:]...) // Remove sim from app.sims
+			break
+		}
+	}
+
 	return nil
 }

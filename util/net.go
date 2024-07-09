@@ -2,18 +2,31 @@ package util
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
+	"mime/multipart"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 )
 
 // NetworkInfo describes a network address for this computer
 type NetworkInfo struct {
 	IPAddress string
 	Hostname  string
+}
+
+// Command represents the structure of a command
+type Command struct {
+	Command  string
+	Username string
+	Data     json.RawMessage
 }
 
 // GetNetworkInfo returns a list of network info
@@ -100,4 +113,116 @@ func GetMachineUUID() (string, error) {
 	default:
 		return "", fmt.Errorf("unsupported platform")
 	}
+}
+
+// SendRequest sends a request to the server
+// -----------------------------------------------------------------
+func SendRequest(url string, cmd *Command) []byte {
+	cmdBytes, _ := json.Marshal(cmd)
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(cmdBytes))
+	if err != nil {
+		fmt.Printf("Error sending request: %v\n", err)
+		return nil
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		fmt.Printf("Received non-OK HTTP status: %s\n", resp.Status)
+		return nil
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Printf("Error reading response: %v\n", err)
+		return nil
+	}
+
+	// PrintHexAndASCII(body, 256)
+	return body
+}
+
+// SendMultipartRequest sends a multipart request to the server
+// -----------------------------------------------------------------
+func SendMultipartRequest(url string, cmd *Command, filePath string) ([]byte, error) {
+	var b bytes.Buffer
+	writer := multipart.NewWriter(&b)
+
+	// Marshal the Command struct
+	cmdBytes, err := json.Marshal(cmd)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal command: %v", err)
+	}
+
+	// Create the JSON part
+	part, err := writer.CreateFormField("data")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create form field: %v", err)
+	}
+	_, err = part.Write(cmdBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to write command data: %v", err)
+	}
+
+	// Add file part
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("error opening file: %v", err)
+	}
+	defer file.Close()
+
+	part, err = writer.CreateFormFile("file", filepath.Base(filePath))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create form file: %v", err)
+	}
+	_, err = io.Copy(part, file)
+	if err != nil {
+		return nil, fmt.Errorf("error copying file content: %v", err)
+	}
+
+	writer.Close()
+
+	req, err := http.NewRequest("POST", url, &b)
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %v", err)
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error sending request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("received non-OK HTTP status: %s", resp.Status)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response: %v", err)
+	}
+	return body, nil
+}
+
+// CheckPort tries to establish a TCP connection to the given port and returns true if successful
+func CheckPort(port int) bool {
+	address := fmt.Sprintf("localhost:%d", port)
+	conn, err := net.DialTimeout("tcp", address, 1*time.Second)
+	if err != nil {
+		return false
+	}
+	conn.Close()
+	return true
+}
+
+// ScanPorts scans the specified range of ports and returns a list of ports with listeners
+func ScanPorts(startPort, endPort int) []int {
+	var openPorts []int
+	for port := startPort; port <= endPort; port++ {
+		if CheckPort(port) {
+			openPorts = append(openPorts, port)
+		}
+	}
+	return openPorts
 }

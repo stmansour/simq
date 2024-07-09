@@ -143,6 +143,24 @@ func (qm *QueueManager) DeleteItem(SID int64) error {
 	return err
 }
 
+func (qm *QueueManager) queryCore(querySQL string) ([]QueueItem, error) {
+	rows, err := qm.db.Query(querySQL)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []QueueItem
+	for rows.Next() {
+		var item QueueItem
+		err := rows.Scan(&item.SID, &item.File, &item.Username, &item.Name, &item.Priority, &item.Description, &item.MachineID, &item.URL, &item.State, &item.DtEstimate, &item.DtCompleted, &item.Created, &item.Modified)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, nil
+}
+
 // GetQueuedAndExecutingItems returns all items in the queue
 func (qm *QueueManager) GetQueuedAndExecutingItems() ([]QueueItem, error) {
 	querySQL := `
@@ -162,23 +180,28 @@ func (qm *QueueManager) GetQueuedAndExecutingItems() ([]QueueItem, error) {
         END,
         Created;
     `
-	rows, err := qm.db.Query(querySQL)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
+	return qm.queryCore(querySQL)
+}
 
-	var items []QueueItem
-	for rows.Next() {
-		var item QueueItem
-		err := rows.Scan(&item.SID, &item.File, &item.Username, &item.Name, &item.Priority, &item.Description, &item.MachineID, &item.URL, &item.State, &item.DtEstimate, &item.DtCompleted, &item.Created, &item.Modified)
-		if err != nil {
-			return nil, err
-		}
-		items = append(items, item)
-	}
+// GetCompletedItems returns all items in the queue
+func (qm *QueueManager) GetCompletedItems() ([]QueueItem, error) {
+	querySQL := `
+	SELECT SID, File, Username, Name, Priority, Description, MachineID, URL, State, DtEstimate, DtCompleted, Created, Modified
+    FROM Queue 
+    WHERE State IN (3,4) ORDER BY DtCompleted ASC LIMIT 50;
+    `
+	return qm.queryCore(querySQL)
+}
 
-	return items, nil
+// GetIncompleteItemsByMachineID returns all items in the queue
+func (qm *QueueManager) GetIncompleteItemsByMachineID(mid string) ([]QueueItem, error) {
+	querySQL := `
+	SELECT SID, File, Username, Name, Priority, Description, MachineID, URL, State, DtEstimate, DtCompleted, Created, Modified
+    FROM Queue 
+    WHERE MachineID = %q AND State IN (0,1,2,3) ORDER BY DtCompleted ASC LIMIT 50;
+    `
+	querySQL = fmt.Sprintf(querySQL, mid)
+	return qm.queryCore(querySQL)
 }
 
 // GetHighestPriorityQueuedItem retrieves the highest priority item from the queue

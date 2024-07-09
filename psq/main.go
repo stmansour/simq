@@ -14,10 +14,40 @@ import (
 	"github.com/stmansour/simq/util"
 )
 
+// CmdData represents the data for a command
+type CmdData struct {
+	Username string
+	SID      int64
+}
+
+// DCommand represents the structure of a command
+type DCommand struct {
+	Command  string
+	ArgCount int
+	Handler  func(*CmdData, []string)
+	Help     string
+}
+
 var app struct {
 	action string
 	file   string
 	sid    int64
+}
+
+// Commands represents the list of commands
+var Commands []DCommand
+
+func init() {
+	Commands = []DCommand{
+		{Command: "add", ArgCount: 1, Handler: addJob, Help: "Add a simulation to the queue"},
+		{Command: "done", ArgCount: 0, Handler: listDoneJobs, Help: "List completed simulations"},
+		{Command: "list", ArgCount: 0, Handler: listJobs, Help: "List pending simulations"},
+		{Command: "listdone", ArgCount: 0, Handler: listDoneJobs, Help: "List completed simulations"},
+		{Command: "delete", ArgCount: 1, Handler: deleteJob, Help: "Delete a simulation from the queue"},
+		{Command: "exit", ArgCount: 0, Handler: handleExit, Help: "Exit the program"},
+		{Command: "quit", ArgCount: 0, Handler: handleExit, Help: "Exit the program"},
+		{Command: "help", ArgCount: 0, Handler: handleHelp, Help: "Show this help message"},
+	}
 }
 
 func main() {
@@ -33,28 +63,36 @@ func main() {
 		fmt.Printf("Error getting current user: %v\n", err)
 		return
 	}
-	username := usr.Username
+	cmd := &CmdData{
+		Username: usr.Username,
+		SID:      *sid,
+	}
+
+	line := ""
+	if *action != "" {
+		for i := range Commands {
+			if Commands[i].Command == *action {
+				line += Commands[i].Command
+				break
+			}
+		}
+	}
 
 	// Handle command-line arguments
 	if app.action != "" {
 		switch app.action {
 		case "add":
-			addJob(username, *file)
-		case "list":
-			listJobs(username)
+			line += " " + *file
 		case "delete":
-			deleteJob(username, *sid)
-		default:
-			fmt.Println("Invalid action. Use add, list, or delete.")
+			line += " " + strconv.Itoa(int(*sid))
 		}
-		return
 	}
 
 	// Start interactive mode
-	interactiveMode(username)
+	interactiveMode(cmd)
 }
 
-func interactiveMode(username string) {
+func interactiveMode(cmd *CmdData) {
 	usr, err := user.Current()
 	if err != nil {
 		log.Fatalf("Failed to get current user: %v", err)
@@ -87,47 +125,36 @@ func interactiveMode(username string) {
 			}
 			break
 		}
+		handleCmd(line, cmd)
+	}
+}
 
-		input := strings.TrimSpace(line)
-		args := strings.Fields(input)
-		if len(args) == 0 {
-			continue
-		}
+func handleCmd(line string, cmd *CmdData) {
+	args := strings.Fields(strings.TrimSpace(line))
+	if len(args) == 0 {
+		return
+	}
 
-		command := strings.ToLower(args[0])
-		switch command {
-		case "add":
-			var file string
-			if len(args) > 1 {
-				file = args[1]
-			} else {
-				file = "config.json5"
+	command := strings.ToLower(args[0])
+	for _, dcmd := range Commands {
+		if dcmd.Command == command {
+			if len(args)-1 != dcmd.ArgCount {
+				fmt.Printf("%s requires %d argument(s).\n", dcmd.Command, dcmd.ArgCount)
+				return
 			}
-			addJob(username, file)
-		case "list":
-			listJobs(username)
-		case "delete":
-			if len(args) > 1 {
-				sid, err := strconv.ParseInt(args[1], 10, 64)
-				if err != nil {
-					fmt.Println("Error: 'delete' command requires a valid simulation ID.")
-				} else {
-					deleteJob(username, sid)
-				}
-			} else {
-				fmt.Println("Error: 'delete' command requires a simulation ID.")
-			}
-		case "exit", "quit":
-			fmt.Println("Exiting interactive mode.")
+			dcmd.Handler(cmd, args[1:])
 			return
-		case "help":
-			fmt.Println("Available commands:")
-			fmt.Println("  add [config file] - Add a new simulation (default: config.json5)")
-			fmt.Println("  list - List all active simulations")
-			fmt.Println("  delete <simulation ID> - Delete a simulation by ID")
-			fmt.Println("  exit, quit - Exit the interactive mode")
-		default:
-			fmt.Println("Unknown command. Type 'help' for a list of commands.")
 		}
+	}
+	fmt.Println("Unknown command. Type 'help' for a list of commands.")
+}
+
+func handleExit(cmd *CmdData, args []string) {
+	os.Exit(0)
+}
+
+func handleHelp(cmd *CmdData, args []string) {
+	for _, dcmd := range Commands {
+		fmt.Printf("%s: %s\n", dcmd.Command, dcmd.Help)
 	}
 }

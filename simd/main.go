@@ -1,6 +1,8 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -49,12 +51,21 @@ var app struct {
 	HTTPHdrsDbg bool         // if true print HTTP headers
 }
 
+func readCommandLineArgs() {
+	flag.BoolVar(&app.HexASCIIDbg, "D", false, "Turn on debug mode")
+	flag.Parse()
+}
+
 func main() {
 	// Load configuration
 	err := loadConfig("simdconf.json5", &app.cfg)
 	if err != nil {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
+
+	// Read command line arguments
+	readCommandLineArgs()
+	app.HTTPHdrsDbg = app.HexASCIIDbg
 
 	//-------------------------------------
 	// GET MY IP ADDRESS
@@ -71,11 +82,21 @@ func main() {
 	}
 	log.Printf("SimdIP Address: %s\n", app.cfg.SimdURL)
 
+	//-------------------------------------------
+	// SEE IF WE NEED TO REBUILD A WORK QUEUE
+	//-------------------------------------------
+	err = RebuildSimulatorList()
+	if err != nil {
+		log.Fatalf("Failed to rebuild simulator list: %v", err)
+	}
+
+	log.Printf("Finished RebuildSimulatorList\n")
+
 	//-------------------------------------
 	// Initial check and run is immediate
 	//-------------------------------------
 	if isAvailable() {
-		err := bookAndRunSimulation()
+		err := bookAndRunSimulation("Book", 0)
 		if err != nil {
 			log.Printf("Failed to book and run simulation: %v", err)
 		}
@@ -88,7 +109,9 @@ func main() {
 	for range ticker.C {
 		// Check if available to run simulations
 		if isAvailable() {
-			err := bookAndRunSimulation()
+			// DEBUG
+			fmt.Printf("SIMD >>>> isAvailable() reports: true\n")
+			err := bookAndRunSimulation("Book", 0)
 			if err != nil {
 				log.Printf("Failed to book and run simulation: %v", err)
 			}

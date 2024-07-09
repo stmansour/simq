@@ -5,17 +5,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 
 	"github.com/stmansour/simq/data"
+	"github.com/stmansour/simq/util"
 	"github.com/yosuke-furukawa/json5/encoding/json5"
 )
-
-// Command represents the structure of a command
-type Command struct {
-	Command  string
-	Username string
-	Data     json.RawMessage
-}
 
 // CreateQueueEntryRequest represents the data for creating a queue entry
 type CreateQueueEntryRequest struct {
@@ -39,7 +35,8 @@ const (
 	defaultURL      = "http://localhost:8250/command"
 )
 
-func addJob(username, file string) {
+func addJob(cmd *CmdData, args []string) {
+	file := args[0]
 	config, err := readConfig(file)
 	if err != nil {
 		fmt.Printf("Error reading config file: %v\n", err)
@@ -55,13 +52,13 @@ func addJob(username, file string) {
 	}
 
 	dataBytes, _ := json.Marshal(data)
-	cmd := Command{
+	command := util.Command{
 		Command:  "NewSimulation",
-		Username: username,
+		Username: cmd.Username,
 		Data:     json.RawMessage(dataBytes),
 	}
 
-	resp, err := sendMultipartRequest(cmd, file)
+	resp, err := util.SendMultipartRequest(defaultURL, &command, file)
 	if err != nil {
 		fmt.Printf("Error sending request: %v\n", err)
 	}
@@ -81,28 +78,51 @@ func readConfig(file string) (Config, error) {
 	return config, err
 }
 
-func listJobs(username string) {
-	cmd := Command{
+func listJobs(cmd *CmdData, args []string) {
+	command := util.Command{
 		Command:  "GetActiveQueue",
-		Username: username,
+		Username: cmd.Username,
 	}
+	listCore(&command)
+}
 
-	body := sendRequest(cmd)
+func listDoneJobs(cmd *CmdData, args []string) {
+	command := util.Command{
+		Command:  "GetCompletedQueue",
+		Username: cmd.Username,
+	}
+	listCore(&command)
+}
+
+func listCore(command *util.Command) {
+	body := util.SendRequest(defaultURL, command)
 
 	resp := struct {
 		Status string
 		Data   []data.QueueItem
 	}{}
+
 	err := json.Unmarshal(body, &resp)
 	if err != nil {
+		if strings.Contains(err.Error(), "unexpected end of JSON input") {
+			fmt.Printf("No jobs found\n")
+			return
+		}
 		fmt.Printf("Error unmarshalling response: %v\n", err)
 		return
 	}
-	states := []string{"Qd", "Bk", "Ex", "Fn", "Er"}
+	states := []string{"Qd", "Bk", "Ex", "Fn", "Ar", "Er"}
 	// 0         1         2         3         4         5         6
 	// 01234567890123456789012345678901234567890123456789
 	// 2024/05/11 HH:MM
-	fmt.Printf("SID PRI ST %-15s %-15s %-16s %-40s %-25s \n", "Username", "File", "Estimate", "MachineID", "Name")
+
+	DtIsEstimate := command.Command == "GetActiveQueue"
+	dt := ""
+	DtCN := "Estimate"
+	if !DtIsEstimate {
+		DtCN = "Completed"
+	}
+	fmt.Printf("SID PRI ST %-15s %-15s %-16s %-40s %-25s \n", "Username", "File", DtCN, "MachineID", "Name")
 	for _, item := range resp.Data {
 		nm := item.Name
 		if len(nm) > 25 {
@@ -112,30 +132,43 @@ func listJobs(username string) {
 		if len(mid) > 40 {
 			mid = mid[:34] + string(rune(0x2026))
 		}
-		estimate := ""
-		if item.DtEstimate.Valid {
-			estimate = item.DtEstimate.Time.Format("2006/01/02 15:04")
+		dt = ""
+		if DtIsEstimate {
+			if item.DtEstimate.Valid {
+				dt = item.DtEstimate.Time.Format("2006/01/02 15:04")
+			}
+		} else {
+			if item.DtCompleted.Valid {
+				dt = item.DtCompleted.Time.Format("2006/01/02 15:04")
+			}
 		}
 
-		fmt.Printf("%3d %3d %2s %-15s %-15s %-16s %-40s %-15s\n", item.SID, item.Priority, states[item.State], item.Username, item.File, estimate, mid, nm)
+		fmt.Printf("%3d %3d %2s %-15s %-15s %-16s %-40s %-15s\n", item.SID, item.Priority, states[item.State], item.Username, item.File, dt, mid, nm)
 	}
 }
 
-func deleteJob(username string, sid int64) {
+func deleteJob(cmd *CmdData, args []string) {
+	sid, err := strconv.ParseInt(args[0], 10, 64)
+	if err != nil {
+		fmt.Println("Error: 'delete' command requires a valid simulation ID.")
+		return
+	}
+	cmd.SID = sid
+
 	data := struct {
 		SID int64
 	}{
-		SID: sid,
+		SID: cmd.SID,
 	}
 
 	dataBytes, _ := json.Marshal(data)
-	cmd := Command{
+	command := util.Command{
 		Command:  "DeleteItem",
-		Username: username,
+		Username: cmd.Username,
 		Data:     json.RawMessage(dataBytes),
 	}
 
-	resp := sendRequest(cmd)
+	resp := util.SendRequest(defaultURL, &command)
 	if resp != nil {
 		fmt.Printf("Delete Job Response: %s\n", string(resp))
 	}

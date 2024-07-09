@@ -105,7 +105,7 @@ func startSimulator(sid int64, configFile string) error {
 	}
 	outputFile.Close()
 
-	fmt.Printf("simulator released\n")
+	fmt.Printf("simulator process released\n")
 
 	//---------------------------------------------------------------
 	// we have a new simulation in process. Add it to the list...
@@ -115,6 +115,7 @@ func startSimulator(sid int64, configFile string) error {
 		Directory: Directory,
 		Cmd:       cmd,
 	}
+
 	app.sims = append(app.sims, sm)
 
 	//---------------------------------------------------------------
@@ -127,6 +128,7 @@ func startSimulator(sid int64, configFile string) error {
 
 // Monitor the simulator process
 func monitorSimulator(sim *Simulation) {
+	fmt.Printf("simd >>>>  %d\n", sim.SID)
 	//-------------------------------------------------------------
 	// First thing to do is get the first line of its log file.
 	// But let's wait 3 seconds to give it time to startup
@@ -148,6 +150,8 @@ func monitorSimulator(sim *Simulation) {
 	}
 	sim.URL = firstLine[startIndex:]
 
+	fmt.Printf("simd >>>> Simulator @ %s\n", sim.URL)
+
 	//-------------------------------------------------------------
 	// Create a ticker that triggers every 5 minutes
 	//-------------------------------------------------------------
@@ -155,10 +159,13 @@ func monitorSimulator(sim *Simulation) {
 	ticker := time.NewTicker(1 * time.Minute) // delete this after debugging
 	defer ticker.Stop()
 
+	log.Printf("simd >>>> ticker loop >>>> timer set for 1 minute intervals\n")
+
 	//-------------------------------------------------------------
 	// Periodically ping the simulator to check its status
 	//-------------------------------------------------------------
 	for range ticker.C {
+		fmt.Printf("simd >>>> ticker loop >>>> Simulator @ %s is still running\n", sim.URL)
 		if !sim.isSimulatorRunning() {
 			log.Printf("Simulator @ %s is no longer running", sim.URL)
 			break

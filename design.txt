@@ -30,11 +30,11 @@ results from the simulations we will run.  We will use a daemon,
 simd, to run on all the hardware that can be utilized for these
 simulations. Each simd can be configured to indicate when the
 computer it's running on can be used for simulations. When it becomes
-available, simd will contact the dispatcher for simulation(s) to run.
-Then simd will initiate the simulation(s). The simulator can tell
-contact the dispatcher directly to indicate how long the simulation
-will take and provide updates during its execution for accurate
-time predictions.
+available, simd will contact the dispatcher for simulation(s) to
+run.  Then simd will initiate the simulation(s). The simulator can
+tell contact the dispatcher directly to indicate how long the
+simulation will take and provide updates during its execution for
+accurate time predictions.
 
 Simulation jobs are added to a Queue by a client process (psq). The
 user must only supply the config file and CSV database file set (as
@@ -161,3 +161,11 @@ This is a topic for a different capability of the PLATO system.
 SIMQ will not be responsible for analyzing any of the simulation
 reports.
 
+Appendix A.  Rebuild simd Work Queue If the simd process dies while
+one or more simulations are still running, we want it to be able
+to recover when it restarts. A restart can happen either manually
+or via the watchdog script to ensure it is running.  When simd
+starts, the first thing it does is contact the dispatcher to ask
+for any queued jobs in state 0 (queued), 1 (booked), 2 (executing),
+or 3 (completed).  If the dispatcher returns any jobs in any of
+these states simd will pick up where it left off. 

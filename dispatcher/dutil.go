@@ -4,7 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"unicode"
+	"os"
+	"path/filepath"
 )
 
 // SvcStatus200 is a simple status message return
@@ -47,34 +48,17 @@ func SvcWriteResponse(w http.ResponseWriter, g interface{}) {
 	SvcWrite(w, b)
 }
 
-// PrintHexAndASCII formats the data in buffer so we can get an idea of what it holds
-func PrintHexAndASCII(buffer []byte, maxChars int) {
-	if maxChars < 1 || maxChars > len(buffer) {
-		maxChars = len(buffer)
+func findConfigFile(configDir string) (string, error) {
+	files, err := os.ReadDir(configDir)
+	if err != nil {
+		return "", err
 	}
 
-	for i := 0; i < maxChars; i += 16 {
-		// Print hex values
-		for j := 0; j < 16; j++ {
-			if i+j < maxChars {
-				fmt.Printf("%02X ", buffer[i+j])
-			} else {
-				fmt.Print("   ")
-			}
+	for _, file := range files {
+		if file.Type().IsRegular() && filepath.Ext(file.Name()) == ".json5" {
+			return filepath.Join(configDir, file.Name()), nil
 		}
-
-		// Print ASCII values
-		fmt.Print(" | ")
-		for j := 0; j < 16; j++ {
-			if i+j < maxChars {
-				b := buffer[i+j]
-				if unicode.IsPrint(rune(b)) {
-					fmt.Printf("%c", b)
-				} else {
-					fmt.Print(".")
-				}
-			}
-		}
-		fmt.Println()
 	}
+
+	return "", fmt.Errorf("no config file found in the directory")
 }

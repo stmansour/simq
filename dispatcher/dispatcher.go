@@ -36,6 +36,11 @@ type CreateQueueEntryRequest struct {
 	OriginalFilename string
 }
 
+// MachineQueueRequest represents the data for creating a machine queue
+type MachineQueueRequest struct {
+	MachineID string
+}
+
 // UpdateItemRequest represents the data for updating a queue item
 type UpdateItemRequest struct {
 	SID         int64
@@ -78,6 +83,12 @@ type SimulationBookingRequest struct {
 	Availability    string
 }
 
+// SimulationRebookRequest represents the data for rebooking a simulation
+type SimulationRebookRequest struct {
+	SID       int64
+	MachineID string
+}
+
 // BookedResponse represents the response for booking a simulation
 type BookedResponse struct {
 	Status         string
@@ -93,13 +104,16 @@ type HInfo struct {
 }
 
 var handlerTable = map[string]HandlerTableEntry{
-	"Book":           {Handler: handleBook},
-	"DeleteItem":     {Handler: handleDeleteItem},
-	"EndSimulation":  {Handler: handleEndSimulation},
-	"GetActiveQueue": {Handler: handleGetActiveQueue},
-	"NewSimulation":  {Handler: handleNewSimulation},
-	"Shutdown":       {Handler: handleShutdown},
-	"UpdateItem":     {Handler: handleUpdateItem},
+	"Book":              {Handler: handleBook},
+	"DeleteItem":        {Handler: handleDeleteItem},
+	"EndSimulation":     {Handler: handleEndSimulation},
+	"GetActiveQueue":    {Handler: handleGetActiveQueue},
+	"GetCompletedQueue": {Handler: handleGetCompletedQueue},
+	"GetMachineQueue":   {Handler: handleGetMachineQueue},
+	"NewSimulation":     {Handler: handleNewSimulation},
+	"Rebook":            {Handler: handleBook},
+	"Shutdown":          {Handler: handleShutdown},
+	"UpdateItem":        {Handler: handleUpdateItem},
 }
 
 // LogAndErrorReturn logs an error and returns an error
@@ -165,7 +179,7 @@ func commandDispatcher(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if app.HexASCIIDbg {
-			PrintHexAndASCII(bodyBytes, 256)
+			util.PrintHexAndASCII(bodyBytes, 256)
 		}
 		if err := json.Unmarshal(bodyBytes, &cmd); err != nil {
 			SvcErrorReturn(w, fmt.Errorf("invalid request payload: %v", err))
@@ -186,7 +200,6 @@ func commandDispatcher(w http.ResponseWriter, r *http.Request) {
 
 	h, ok = handlerTable[cmd.Command]
 	if !ok {
-		// Shouldn't happen, but handle for safety
 		log.Printf("Internal Error: handler not found for command: %s", cmd.Command)
 		return
 	}
@@ -344,51 +357,75 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) { // 
 // handleBook handles the Book command
 // ---------------------------------------------------------------------------
 func handleBook(w http.ResponseWriter, r *http.Request, d *HInfo) {
+	var queueItem data.QueueItem
+	var err error
 	//---------------------------------------------------
 	// Decode the booking request
 	//---------------------------------------------------
 	var bookingRequest SimulationBookingRequest
-	if err := json.Unmarshal(d.cmd.Data, &bookingRequest); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("invalid booking request data"))
-		return
-	}
-
-	//---------------------------------------------------
-	// Retrieve the highest priority job from the queue
-	//---------------------------------------------------
-	queueItem, err := app.qm.GetHighestPriorityQueuedItem()
-	if err != nil {
-		if err == sql.ErrNoRows {
-			msg := SvcStatus201{
-				Status:  "success",
-				Message: "no items in queue",
-				ID:      0,
-			}
-			w.WriteHeader(http.StatusOK)
-			SvcWriteResponse(w, &msg)
+	var rebookRequest SimulationRebookRequest
+	switch d.cmd.Command {
+	case "Book":
+		log.Printf("handling Book command\n")
+		if err := json.Unmarshal(d.cmd.Data, &bookingRequest); err != nil {
+			SvcErrorReturn(w, fmt.Errorf("invalid booking request data"))
+			return
 		}
-		SvcErrorReturn(w, fmt.Errorf("failed to get highest priority queued item"))
-		return
-	}
-
-	//*****************************************************************************
-	// Mark the item as booked
-	//*****************************************************************************
-	queueItem.State = data.StateBooked
-	queueItem.MachineID = bookingRequest.MachineID
-	if err := app.qm.UpdateItem(queueItem); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("failed to update queue item"))
+		//---------------------------------------------------
+		// Retrieve the highest priority job from the queue
+		//---------------------------------------------------
+		queueItem, err = app.qm.GetHighestPriorityQueuedItem()
+		if err != nil {
+			if strings.Contains(err.Error(), "no queued items") {
+				msg := SvcStatus201{
+					Status:  "success",
+					Message: "no queued items need booking",
+					ID:      0,
+				}
+				w.WriteHeader(http.StatusOK)
+				SvcWriteResponse(w, &msg)
+				return
+			}
+			SvcErrorReturn(w, fmt.Errorf("err: %s", err.Error()))
+			return
+		}
+	case "Rebook":
+		log.Printf("handling Rebook command\n")
+		if err := json.Unmarshal(d.cmd.Data, &rebookRequest); err != nil {
+			SvcErrorReturn(w, fmt.Errorf("invalid rebook request data"))
+			return
+		}
+		queueItem, err = app.qm.GetItemByID(rebookRequest.SID)
+		if err != nil {
+			SvcErrorReturn(w, fmt.Errorf("err: %s", err.Error()))
+			return
+		}
+		if queueItem.MachineID != rebookRequest.MachineID {
+			log.Printf("*** WARNING *** Granted MachineID %s rebooking for SID %d originally assigned to MachineID %s", rebookRequest.MachineID, rebookRequest.SID, queueItem.MachineID)
+		}
+	default:
+		SvcErrorReturn(w, fmt.Errorf("invalid command"))
 		return
 	}
 
 	//-----------------------------------------------------------------------------
-	// Create the MULTIPARTresponse
+	// FIND THE CONFIG FILE FOR THIS JOB
+	//-----------------------------------------------------------------------------
+	configDir := fmt.Sprintf("qdconfigs/%d", queueItem.SID)
+	configFilename, err := findConfigFile(configDir)
+	if err != nil {
+		SvcErrorReturn(w, fmt.Errorf("error finding config file: %s", err.Error()))
+		return
+	}
+
+	//-----------------------------------------------------------------------------
+	// Create the MULTIPART response
 	//-----------------------------------------------------------------------------
 	response := BookedResponse{
 		Status:         "success",
 		Message:        "simulation booked",
 		SID:            queueItem.SID,
-		ConfigFilename: "config.json5",
+		ConfigFilename: filepath.Base(configFilename),
 	}
 	multipartWriter := multipart.NewWriter(w)
 	w.Header().Set("Content-Type", multipartWriter.FormDataContentType())
@@ -434,6 +471,21 @@ func handleBook(w http.ResponseWriter, r *http.Request, d *HInfo) {
 		SvcErrorReturn(w, fmt.Errorf("failed to close multipart writer"))
 		return
 	}
+
+	//*****************************************************************************
+	// ONLY MARK AS BOOKED IF WE GET THIS FAR
+	//*****************************************************************************
+	queueItem.State = data.StateBooked
+	if d.cmd.Command == "Rebook" {
+		queueItem.MachineID = rebookRequest.MachineID
+	} else {
+		queueItem.MachineID = bookingRequest.MachineID
+	}
+	if err := app.qm.UpdateItem(queueItem); err != nil {
+		SvcErrorReturn(w, fmt.Errorf("failed to update queue item"))
+		return
+	}
+
 }
 
 // handleNewSimulation handles the NewSimulation command
@@ -576,6 +628,75 @@ func handleGetActiveQueue(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	}
 	SvcWriteResponse(w, &resp)
 }
+
+// handleGetMachineQueue returns the queue of all incomplete items for the
+// specified machine
+// -----------------------------------------------------------------------------
+func handleGetMachineQueue(w http.ResponseWriter, r *http.Request, d *HInfo) {
+	//-----------------------------------------------------------
+	// Unmarshal the command data into MachineQueueRequest
+	//-----------------------------------------------------------
+	var req MachineQueueRequest
+	if err := json.Unmarshal(d.cmd.Data, &req); err != nil {
+		SvcErrorReturn(w, fmt.Errorf("failed to unmarshal request data"))
+		return
+	}
+	items, err := app.qm.GetIncompleteItemsByMachineID(req.MachineID)
+	if err != nil {
+		SvcErrorReturn(w, fmt.Errorf("failed to get incomplete queue items for machine %s, error: %v", req.MachineID, err))
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	resp := struct {
+		Status string
+		Data   []data.QueueItem
+	}{
+		Status: "success",
+		Data:   items,
+	}
+	SvcWriteResponse(w, &resp)
+}
+
+// handleGetCompletedQueue handles the GetCompletedQueue command
+// -----------------------------------------------------------------------------
+func handleGetCompletedQueue(w http.ResponseWriter, r *http.Request, d *HInfo) {
+	items, err := app.qm.GetCompletedItems()
+	if err != nil {
+		SvcErrorReturn(w, fmt.Errorf("failed to get active queue items"))
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	resp := struct {
+		Status string
+		Data   []data.QueueItem
+	}{
+		Status: "success",
+		Data:   items,
+	}
+	SvcWriteResponse(w, &resp)
+}
+
+// handleGetCompletedQueue handles the GetCompletedQueue command
+// -----------------------------------------------------------------------------
+// func handleGetCompletedQueue(w http.ResponseWriter, r *http.Request, d *HInfo) {
+// 	items, err := app.qm.GetQueuedAndExecutingItems()
+// 	if err != nil {
+// 		SvcErrorReturn(w, fmt.Errorf("failed to get active queue items"))
+// 		return
+// 	}
+
+// 	w.WriteHeader(http.StatusOK)
+// 	resp := struct {
+// 		Status string
+// 		Data   []data.QueueItem
+// 	}{
+// 		Status: "success",
+// 		Data:   items,
+// 	}
+// 	SvcWriteResponse(w, &resp)
+// }
 
 // handleUpdateItem handles the UpdateItem command
 // -----------------------------------------------------------------------------

@@ -14,13 +14,6 @@ import (
 	"github.com/stmansour/simq/util"
 )
 
-// Command represents the structure of a command
-type Command struct {
-	Command  string
-	Username string
-	Data     json.RawMessage
-}
-
 // SimulationBookingRequest represents the data for booking a simulation
 type SimulationBookingRequest struct {
 	Command         string
@@ -46,32 +39,50 @@ type SvcStatus200 struct {
 }
 
 // bookAndRunSimulation books a simulation and runs it
-func bookAndRunSimulation() error {
-	cmd := Command{
-		Command:  "Book",
+func bookAndRunSimulation(bkcmd string, sid int64) error {
+	var err error
+	var dataBytes []byte
+	var machineID string
+
+	cmd := util.Command{
+		Command:  bkcmd,
 		Username: "simd",
 	}
-
-	cmdDataStruct := struct {
-		MachineID       string
-		CPUs            int
-		Memory          string
-		CPUArchitecture string
-		Availability    string
-	}{
-		CPUs:            10,
-		Memory:          "64GB",
-		CPUArchitecture: "ARM64",
-		Availability:    "always",
-	}
-	var err error
-	cmdDataStruct.MachineID, err = util.GetMachineUUID()
+	machineID, err = util.GetMachineUUID()
 	if err != nil {
 		return fmt.Errorf("failed to get machine ID: %v", err)
 	}
-	dataBytes, err := json.Marshal(cmdDataStruct)
-	if err != nil {
-		return fmt.Errorf("failed to marshal book request: %v", err)
+
+	if bkcmd == "Book" {
+		cmdDataStruct := struct {
+			MachineID       string
+			CPUs            int
+			Memory          string
+			CPUArchitecture string
+			Availability    string
+		}{
+			MachineID:       machineID,
+			CPUs:            10,
+			Memory:          "64GB",
+			CPUArchitecture: "ARM64",
+			Availability:    "always",
+		}
+		dataBytes, err = json.Marshal(cmdDataStruct)
+		if err != nil {
+			return fmt.Errorf("failed to marshal book request: %v", err)
+		}
+	} else if bkcmd == "Rebook" {
+		cmdDataStruct := struct {
+			MachineID string
+			SID       int64
+		}{
+			MachineID: machineID,
+			SID:       sid,
+		}
+		dataBytes, err = json.Marshal(cmdDataStruct)
+		if err != nil {
+			return fmt.Errorf("failed to marshal book request: %v", err)
+		}
 	}
 	cmd.Data = json.RawMessage(dataBytes)
 	bookData, err := json.Marshal(cmd)
@@ -134,7 +145,6 @@ func bookAndRunSimulation() error {
 	if app.HTTPHdrsDbg {
 		PrintHexAndASCII(bodyBytes, len(bodyBytes))
 	}
-
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("unexpected status code: %v, body: %s", resp.StatusCode, string(bodyBytes))
 	}
@@ -196,11 +206,16 @@ func bookAndRunSimulation() error {
 			Message string
 		}
 		if err := json.Unmarshal(bodyBytes, &respMessage); err != nil {
-			return fmt.Errorf("failed to unmarshal response: %v", err)
+			return fmt.Errorf(">>>> failed to unmarshal response: %v", err)
 		}
 		if respMessage.Message == "no items in queue" {
+			fmt.Printf(">>>> dispatcher has no items in the queue\n")
 			return nil // This is an expected response
 		} else if respMessage.Status != "success" {
+			if strings.Contains(respMessage.Message, "no items in queue") {
+				fmt.Printf(">>>> dispatcher has no items in the queue\n")
+				return nil
+			}
 			log.Printf("**** ERROR **** Failed to book simulation: %s", respMessage.Message)
 		}
 	}
