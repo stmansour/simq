@@ -136,11 +136,11 @@ func listCore(command *util.Command) {
 		dt = ""
 		if DtIsEstimate {
 			if item.DtEstimate.Valid {
-				dt = item.DtEstimate.Time.In(time.Local).Format("Jan 2, 2006 03:04 PM")
+				dt = item.DtEstimate.Time.In(time.Local).Format("Jan 2, 2006 03:04pm")
 			}
 		} else {
 			if item.DtCompleted.Valid {
-				dt = item.DtCompleted.Time.In(time.Local).Format("Jan 2, 2006 03:04 PM")
+				dt = item.DtCompleted.Time.In(time.Local).Format("Jan 2, 2006 03:04pm")
 			}
 		}
 

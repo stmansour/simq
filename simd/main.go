@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -114,7 +113,7 @@ func main() {
 	defer ticker.Stop()
 	for range ticker.C {
 		if isAvailable() {
-			fmt.Printf("simd >>>> isAvailable() reports: true\n") // debug
+			// fmt.Printf("simd >>>> isAvailable() reports: true\n") // debug
 			err := bookAndRunSimulation("Book", 0)
 			if err != nil {
 				log.Printf("Failed to book and run simulation: %v", err)
