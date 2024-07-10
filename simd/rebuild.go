@@ -81,7 +81,6 @@ func RebuildSimulatorList() error {
 				Dir:          entry.Name(),
 				InDispatcher: false,
 			}
-			fmt.Println(entry.Name())
 			dirs = append(dirs, d)
 		}
 	}
@@ -90,15 +89,18 @@ func RebuildSimulatorList() error {
 	// DEBUG
 	//------------------
 	if len(dirs) > 0 {
-		fmt.Printf("SIMD: dispatcher reports %d simulations belonging to this machine\n", len(dirs))
+		fmt.Printf("SIMD: dispatcher reports %d simulations belonging to this machine\n", len(resp.Data))
+		s := "      SIDs = "
 		for i := 0; i < len(resp.Data); i++ {
-			fmt.Printf("sid: %d\n", resp.Data[i].SID)
+			s += fmt.Sprintf("%d ", resp.Data[i].SID)
 		}
-		fmt.Printf("SIMD: found these directories SID simulation directories\n")
+		fmt.Printf("%s\n", s)
+		fmt.Printf("SIMD: these SID simulation directories are in simd's simulation directory:\n")
+		s = "      DIRS = "
 		for i := 0; i < len(dirs); i++ {
-			fmt.Printf("%s ", dirs[i].Dir)
+			s += fmt.Sprintf("%s ", dirs[i].Dir)
 		}
-		fmt.Printf("\n")
+		fmt.Printf("%s\n", s)
 	}
 
 	//---------------------------------------------------------------------------
@@ -318,6 +320,16 @@ func (sim *Simulation) recoverBasedOnFiles() (bool, error) {
 	return false, nil
 }
 
+func logNotListening(notlistening []int) {
+	if len(notlistening) > 0 {
+		s := "nothing listening on ports: "
+		for i := 0; i < len(notlistening); i++ {
+			s += fmt.Sprintf("%d ", notlistening[i])
+		}
+		log.Printf("%s\n", s)
+	}
+}
+
 // FindRunningSimulator - Search for a running simulator that belongs to this simulation
 // If it finds the simulator running it will return true. Otherwise it returns false
 // --------------------------------------------------------------------------------
@@ -325,29 +337,32 @@ func (sim *Simulation) FindRunningSimulator() bool {
 	//-------------------------------
 	// SEARCH ALL POSSIBLE PORTS
 	//-------------------------------
+	notlistening := []int{}
 	for port := 8090; port <= 8100; port++ {
 		url := fmt.Sprintf("http://127.0.0.1:%d/status", port)
 		sid, foundSID, err := FetchSID(url)
 		if err != nil {
 			if strings.Contains(err.Error(), "connect: connection refused") {
-				log.Printf("nothing listening on port %d", port)
+				notlistening = append(notlistening, port)
 				continue
 			}
 			log.Printf("Error searching for sid on port %d: %v", port, err)
 			continue
 		}
 		if foundSID && sim.SID == sid {
+			logNotListening(notlistening)
 			//----------------------------------------------------
 			// FOUND IT!!!
 			// The simulator is still running.  Save the URL
 			// and continue to monitor it as usual
 			//----------------------------------------------------
-			log.Printf("simd:  >>>>    **** RECOVERED ****   Connected with running for SID = %d on port %d\n", sim.SID, port)
+			log.Printf("simd:  >>>>    **** RECOVERED ****   Connected with running simulatorfor SID = %d on port %d\n", sim.SID, port)
 			sim.URL = url
 			go monitorSimulator(sim)
 			return true
 		}
 	}
+	logNotListening(notlistening)
 	return false
 }
 

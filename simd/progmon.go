@@ -175,7 +175,7 @@ func monitorSimulator(sim *Simulation) {
 	// Periodically ping the simulator to check its status
 	//-------------------------------------------------------------
 	for range ticker.C {
-		fmt.Printf("simd >>>> ticker loop >>>> Simulator @ %s is still running\n", sim.URL)
+		// fmt.Printf("simd >>>> ticker loop >>>> Simulator @ %s is still running\n", sim.URL)
 		if !sim.isSimulatorRunning() {
 			log.Printf("Simulator @ %s is no longer running", sim.URL)
 			break

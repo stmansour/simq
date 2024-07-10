@@ -678,26 +678,6 @@ func handleGetCompletedQueue(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	SvcWriteResponse(w, &resp)
 }
 
-// handleGetCompletedQueue handles the GetCompletedQueue command
-// -----------------------------------------------------------------------------
-// func handleGetCompletedQueue(w http.ResponseWriter, r *http.Request, d *HInfo) {
-// 	items, err := app.qm.GetQueuedAndExecutingItems()
-// 	if err != nil {
-// 		SvcErrorReturn(w, fmt.Errorf("failed to get active queue items"))
-// 		return
-// 	}
-
-// 	w.WriteHeader(http.StatusOK)
-// 	resp := struct {
-// 		Status string
-// 		Data   []data.QueueItem
-// 	}{
-// 		Status: "success",
-// 		Data:   items,
-// 	}
-// 	SvcWriteResponse(w, &resp)
-// }
-
 // handleUpdateItem handles the UpdateItem command
 // -----------------------------------------------------------------------------
 func handleUpdateItem(w http.ResponseWriter, r *http.Request, d *HInfo) {
