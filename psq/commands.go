@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/stmansour/simq/data"
 	"github.com/stmansour/simq/util"
@@ -122,7 +123,7 @@ func listCore(command *util.Command) {
 	if !DtIsEstimate {
 		DtCN = "Completed"
 	}
-	fmt.Printf("SID PRI ST %-15s %-15s %-16s %-40s %-25s \n", "Username", "File", DtCN, "MachineID", "Name")
+	fmt.Printf("SID PRI ST %-15s %-15s %-20s %-40s %-25s \n", "Username", "File", DtCN, "MachineID", "Name")
 	for _, item := range resp.Data {
 		nm := item.Name
 		if len(nm) > 25 {
@@ -135,15 +136,15 @@ func listCore(command *util.Command) {
 		dt = ""
 		if DtIsEstimate {
 			if item.DtEstimate.Valid {
-				dt = item.DtEstimate.Time.Format("2006/01/02 15:04")
+				dt = item.DtEstimate.Time.In(time.Local).Format("Jan 2, 2006 03:04 PM")
 			}
 		} else {
 			if item.DtCompleted.Valid {
-				dt = item.DtCompleted.Time.Format("2006/01/02 15:04")
+				dt = item.DtCompleted.Time.In(time.Local).Format("Jan 2, 2006 03:04 PM")
 			}
 		}
 
-		fmt.Printf("%3d %3d %2s %-15s %-15s %-16s %-40s %-15s\n", item.SID, item.Priority, states[item.State], item.Username, item.File, dt, mid, nm)
+		fmt.Printf("%3d %3d %2s %-15s %-15s %-20s %-40s %-15s\n", item.SID, item.Priority, states[item.State], item.Username, item.File, dt, mid, nm)
 	}
 }
 

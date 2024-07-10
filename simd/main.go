@@ -57,13 +57,19 @@ func readCommandLineArgs() {
 }
 
 func main() {
-	// Load configuration
+	app.sims = make([]Simulation, 0) // initialize it empty
+
+	//-------------------------------------
+	// READ CONFIG
+	//-------------------------------------
 	err := loadConfig("simdconf.json5", &app.cfg)
 	if err != nil {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
 
-	// Read command line arguments
+	//-------------------------------------
+	// HANDLE COMMAND LINE ARGUMENTS
+	//-------------------------------------
 	readCommandLineArgs()
 	app.HTTPHdrsDbg = app.HexASCIIDbg
 
@@ -82,18 +88,17 @@ func main() {
 	}
 	log.Printf("SimdIP Address: %s\n", app.cfg.SimdURL)
 
-	//-------------------------------------------
-	// SEE IF WE NEED TO REBUILD A WORK QUEUE
-	//-------------------------------------------
+	//-----------------------------------------------------
+	// SEE IF WE NEED TO RESTORE ANY INTERRUPTED JOBS...
+	//-----------------------------------------------------
 	err = RebuildSimulatorList()
 	if err != nil {
 		log.Fatalf("Failed to rebuild simulator list: %v", err)
 	}
-
 	log.Printf("Finished RebuildSimulatorList\n")
 
 	//-------------------------------------
-	// Initial check and run is immediate
+	// AFTER REBUILD CHECKS, BOOK AND RUN
 	//-------------------------------------
 	if isAvailable() {
 		err := bookAndRunSimulation("Book", 0)
@@ -102,15 +107,14 @@ func main() {
 		}
 	}
 
-	// Create a ticker that triggers every minute
+	//---------------------------------------------------------------
+	// NOTHING TO DO NOW. PERIODICALLY CHECK FOR WORK AND HANDLE IT
+	//---------------------------------------------------------------
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
-
 	for range ticker.C {
-		// Check if available to run simulations
 		if isAvailable() {
-			// DEBUG
-			fmt.Printf("SIMD >>>> isAvailable() reports: true\n")
+			fmt.Printf("simd >>>> isAvailable() reports: true\n") // debug
 			err := bookAndRunSimulation("Book", 0)
 			if err != nil {
 				log.Printf("Failed to book and run simulation: %v", err)

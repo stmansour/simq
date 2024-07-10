@@ -42,25 +42,24 @@ fi
 # ON WITH IT!
 #---------------------
 echo "-------------------------------------------------------------"
-echo "Resetting simulations directory"
+echo "|  Resetting simd's simulations directory"
 echo "-------------------------------------------------------------"
 rm -rf simulations
 tar xvf sims.tar
 
 echo "-------------------------------------------------------------"
-echo "Resetting dispatcher queue"
+echo "|  Resetting dispatcher queue"
 echo "-------------------------------------------------------------"
 /usr/local/mysql/bin/mysql simq < simq.sql
 echo "SELECT * FROM Queue;" | /usr/local/mysql/bin/mysql simq
 
 echo "-------------------------------------------------------------"
-echo "Resetting /opt/simulation-results directory"
+echo "|  Resetting /opt/simulation-results directory"
 echo "-------------------------------------------------------------"
 rm -rf /opt/simulation-results/2024
 
 echo "-------------------------------------------------------------"
-echo "Updating dispatcher's qdconfigs directory for SID 5"
+echo "|  Resetting dispatcher's qdconfigs directory"
 echo "-------------------------------------------------------------"
-rm -rf ../dispatcher/qdconfigs/5
-mkdir -p ../dispatcher/qdconfigs/5
-mv simulations/5/sm.json5 ../dispatcher/qdconfigs/5/
+rm -rf ../dispatcher/qdconfigs
+tar xvf qds.tar -C ../dispatcher/

@@ -181,40 +181,42 @@ func recoverExecutingSimulation(qi *data.QueueItem) {
 	bookAndRunSimulation("Rebook", sim.SID)
 }
 
-// recoverArchiveSimResults - In this case, the simulation finished but
-// the results were not archived. Attempt to archive them
+// recoverArchiveSimResults - In this case, the simulation was apparently
+// finished but the results were not archived. Attempt to archive them
 // -----------------------------------------------------------------------
 func recoverArchiveSimResults(qi *data.QueueItem) {
 	sim := buildSimFromQueueItem(qi)
-	fmt.Printf("simd >>>> attempting to recover an archived simulation results, sid = %d\n", qi.SID)
-	configs, err := findJSON5Files(sim.Directory)
+
+	//--------------------------------
+	// SEE IF THE ARCHIVE FILE EXISTS
+	//--------------------------------
+	files, err := getFilenamesInDir(sim.Directory)
 	if err != nil {
-		log.Printf("Simulation: %d - error occurred lookng for config file in %s: error: %v\n", qi.SID, sim.Directory, err)
+		log.Printf("simd >>>> Simulation: %d - error while loading filenames in %s: error: %v\n", sim.SID, sim.Directory, err)
 		return
 	}
-
-	//---------------------------------------------------------
-	// If there is no config file, we can try to rerun it
-	//---------------------------------------------------------
-	if len(configs) == 0 {
-		log.Printf("Simulation for SID: %d - Missing config file in directory: %s\n", qi.SID, sim.Directory)
-		log.Printf("Rebooking...\n")
-		bookAndRunSimulation("Rebook", qi.SID)
-		return
+	found := false
+	for i := 0; i < len(files); i++ {
+		if files[i] == "results.tar.gz" {
+			found = true
+			break
+		}
 	}
 
-	//---------------------------------------------------------
-	// otherwise take the first config file found
-	//---------------------------------------------------------
-	if len(configs) > 1 {
-		log.Printf("Simulation for SID: %d - More than one config file in directory: %s\n", qi.SID, sim.Directory)
-		log.Printf("Unclear how to handle this case, so we're bailing out (ignoring it)\n")
-		return
+	//--------------------------------
+	// IF IT WASN'T FOUND, CREATE IT
+	//--------------------------------
+	if !found {
+		err = sim.archiveSimulationResults()
+		if err != nil {
+			log.Printf("simd >>>> Simulation: %d - error creating results archive in %s: error: %v\n", sim.SID, sim.Directory, err)
+			return
+		}
 	}
 
-	sim.ConfigFile = configs[0]
-	app.sims = append(app.sims, sim)
-
+	//--------------------------------
+	//  SEND END SIMULATION REQUEST
+	//--------------------------------
 	if err = sim.sendEndSimulationRequest(); err != nil {
 		log.Printf("Failed to send end simulation request: %v", err)
 		return
@@ -225,17 +227,27 @@ func recoverArchiveSimResults(qi *data.QueueItem) {
 // we never go the simulator started.  Try to recover.
 // -------------------------------------------------------------------------
 func recoverBookedSimulation(qi *data.QueueItem) {
-	var sim Simulation
+	sim := buildSimFromQueueItem(qi)
 	fmt.Printf("simd >>>> attempting to recover a booked simulation, sid = %d\n", qi.SID)
-	//-----------------------------------------
-	// FIRST, DO WE HAVE THE CONFIG FILE
-	// Check for the existence of a file ending in .json5
-	// in ./simulations/<SID>
-	//-----------------------------------------
-	directory := fmt.Sprintf("./simulations/%d", qi.SID)
-	configs, err := findJSON5Files(directory)
+
+	//-----------------------------------------------------------------
+	// Because I've seen it happen, just check to see if the simulator
+	// actually finished.  If so, somehow the updates were never sent
+	// to the dispatcher.  This may be because the machine lost its
+	// network connection. In any case, if we have all the files,
+	// just archive them and move on.
+	//---------------------------------------------------------------
+	if recovered, err := sim.recoverBasedOnFiles(); err != nil || recovered {
+		return // error occurred and logged
+	}
+
+	//------------------------------------------------------------------
+	// OK, apparently, the simulator did not complete that simulation.
+	// See if we have a config file...
+	//------------------------------------------------------------------
+	configs, err := findJSON5Files(sim.Directory)
 	if err != nil {
-		log.Printf("Simulation: %d - error occurred lookng for config file in %s: error: %v\n", qi.SID, directory, err)
+		log.Printf("Simulation: %d - error occurred lookng for config file in %s: error: %v\n", qi.SID, sim.Directory, err)
 		return
 	}
 
@@ -243,19 +255,11 @@ func recoverBookedSimulation(qi *data.QueueItem) {
 	// IF WE DID NOT FIND ANY CONFIG FILES, REBOOK
 	//---------------------------------------------------
 	if len(configs) == 0 {
-		log.Printf("Simulation for SID: %d - Missing config file in directory: %s\n", qi.SID, directory)
+		log.Printf("Simulation for SID: %d - Missing config file in directory: %s\n", qi.SID, sim.Directory)
 		log.Printf("Rebooking...\n")
 		bookAndRunSimulation("Rebook", qi.SID)
 		return
 	}
-
-	//------------------------------------------------------------------------
-	// If we have a config file, then we can do a lot. First, we can create
-	// enough of a simulation object to use many of its methods...
-	//------------------------------------------------------------------------
-	sim.SID = qi.SID
-	sim.Directory = directory
-	sim.ConfigFile = configs[0]
 
 	//---------------------------------------------------------------
 	// Next, we check for the existence of a "finrep.csv" file. If
@@ -338,7 +342,7 @@ func (sim *Simulation) FindRunningSimulator() bool {
 			// The simulator is still running.  Save the URL
 			// and continue to monitor it as usual
 			//----------------------------------------------------
-			log.Printf("REBUILD: Found running simulator for SID = %d on port %d\n", sim.SID, port)
+			log.Printf("simd:  >>>>    **** RECOVERED ****   Connected with running for SID = %d on port %d\n", sim.SID, port)
 			sim.URL = url
 			go monitorSimulator(sim)
 			return true
