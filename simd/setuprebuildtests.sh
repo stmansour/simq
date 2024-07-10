@@ -6,6 +6,23 @@
 #  So, we maintain a list of machines on which it's OK to
 #  run. If the script finds that it's not on one of these
 #  systems it will exit out before doing anything.
+#
+#  Explanation of this test
+#  ------------------------
+#  It does the following:
+#  1. Resets the dispatcher's qdconfigs/ directory to the contents of qds.tar
+#  2. Resets simd's simulations/ directory to the contents of sims.tar
+#  3. Resets database simq table Queue to match the contents of dispatcher's qdconfigs/
+#  4. should recover all test cases.
+#
+#  How To Run
+#  ----------
+#  1. Run this script to set up the environment. It should be run from its source directory.
+#  2. In a separate window run dispatcher in its sourcecode home
+#  3. Optional: run psq in a separate window to examine the queue
+#  4. Optional: run simtalk in a separate window
+#  5. start simd:   ./simd
+#
 
 ALLOW=0
 allowableNames=(
