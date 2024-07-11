@@ -231,12 +231,14 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) { // 
 	//----------------------------------------------------------------------------
 	// BUILD THE DESTINATION DIRECTORY
 	// /opt/simulation-results/YYYY/MM/DD/SID/results.tar.gz
+	//
+	// for testing: /opt/TestSimResultsRepo
 	//----------------------------------------------------------------------------
 	now := time.Now()
 	year := now.Year()
 	month := now.Month()
 	day := now.Day()
-	dirPath := filepath.Join("/opt", "simulation-results",
+	dirPath := filepath.Join(app.SimResultsDir,
 		fmt.Sprintf("%d", year),
 		fmt.Sprintf("%d", month),
 		fmt.Sprintf("%d", day),

@@ -15,33 +15,38 @@ simulations in order to automate each task responsibility of defining
 a simulation from that of running it and collecting the results.
 The SIMQ Scheduler is our first attempt to automate step (b).
 
-The 'dispatcher' will handle running the simulations. It will be
-based on a queue of defined simulations. The dispatcher will manage
-the queue.  It will insert newly defined simulations and will be
-responsible for assigning them to compute resources that can run
-them and report back with the results. The compute resources can
-be a company server, or a cloud-based resource.  Simulations on
-company servers will be managed based on their capacity. Cloud-based
-servers will also be used once we begin fully utilizing the computers
-within our company.  Currently, a lot of computers sit idle during
-the nights and weekends. We want to use the SIMQ system to take
-advantage of all these idle compute resources to begin collecting
-results from the simulations we will run.  We will use a daemon,
-simd, to run on all the hardware that can be utilized for these
-simulations. Each simd can be configured to indicate when the
-computer it's running on can be used for simulations. When it becomes
-available, simd will contact the dispatcher for simulation(s) to
-run.  Then simd will initiate the simulation(s). The simulator can
-tell contact the dispatcher directly to indicate how long the
-simulation will take and provide updates during its execution for
-accurate time predictions.
+The 'dispatcher' will handle maintaining the state of all simulations.
+It will be based on a queue of defined simulations. The dispatcher
+will manage the queue.  It will insert newly defined simulations
+and will be responsible for assigning them to compute resources
+that can run them and report back with the results. The compute
+resources can be a company server, or a cloud-based resource.
+Simulations on company servers will be managed based on their
+capacity. Cloud-based servers will also be used once we begin fully
+utilizing the computers within our company.  Currently, a lot of
+computers sit idle during the nights and weekends. We want to use
+the SIMQ system to take advantage of all these idle compute resources
+to begin collecting results from the simulations we will run.  We
+will use a daemon, simd, to run on all the hardware that can be
+utilized for these simulations. Each simd can be configured to
+indicate when the computer it's running on can be used for simulations.
+When it becomes available, simd will contact the dispatcher for
+simulation(s) to run.  Then simd will initiate the simulation(s).
+The simulator can tell contact the dispatcher directly to indicate
+how long the simulation will take and provide updates during its
+execution for accurate time predictions. Finally, when the simulation
+is complete the simulator sends the dispatcher a message indicating
+that it finished. The simd process will detect that the simulator
+is finished and transfer the results to the dispatcher.  Simulation
+jobs are added to a Queue by a client process (psq). The user only
+needs to supply the config file. The dispatcher then archives the
+config file while the simulation is running. Once the simulation
+is completed and the results have been sent to the dispatcher to
+be archived, the dispatcher puts the results in to the simulation
+results repository (/opt/simulation-results) which organizes its
+results in the filesystem by date and Simulation ID (SID) as follows:
+./YYYY/MM/DD/SID/(result files)
 
-Simulation jobs are added to a Queue by a client process (psq). The
-user must only supply the config file and CSV database file set (as
-a tar gz file) and a few other bits of information. The psq program
-will contact the dispatcher, copy the tar.gz file to a local file
-on the dispatcher's system, then add the new simulation request to
-the queue.
 
 Each item in the queue has an associated State indicating where it
 is in its lifecycle. The main states are: queued, booked, executing,
@@ -90,6 +95,25 @@ the reports it generated and they are saved under the Simulations
 Results Root in the filesystem under a folder for the date on which
 it completed then in a folder whose name is the SID (the Simulation
 ID). The result files are now available for analysis by the team.
+
+As the number of computers devoted to doing simulations increases,
+the potential for problems in the overall system increases. It may
+seem odd that the job of packaging up the result files, and sending
+them to the dispatcher is the responsibility of simd. There are
+many reasons for this, the primary reason is clarity of purpose.
+Rather than embed a lot of error recovery code into the simulator,
+simd is responsible for recovering after the myriad of errors that
+can occur between these systems. It knows how to contact running
+instances of simulator and determine if they are working on a
+simulation that it was assigned. simd knows how to recover from
+many error conditions. For example, if a remote machine was working
+on one or more simulations that required a long time (days or weeks)
+and that machine lost its internet connection and recovered it later
+simd will detect what happened and work with the dispatcher to
+archive any results that completed while it was offline. It can
+rebook simulations if necessary, and it can restart simulations if
+for some reason they terminated prior to completing their results.
+
 
 Security
 
@@ -160,12 +184,3 @@ Analysis Of Simulation Reports
 This is a topic for a different capability of the PLATO system.
 SIMQ will not be responsible for analyzing any of the simulation
 reports.
-
-Appendix A.  Rebuild simd Work Queue If the simd process dies while
-one or more simulations are still running, we want it to be able
-to recover when it restarts. A restart can happen either manually
-or via the watchdog script to ensure it is running.  When simd
-starts, the first thing it does is contact the dispatcher to ask
-for any queued jobs in state 0 (queued), 1 (booked), 2 (executing),
-or 3 (completed).  If the dispatcher returns any jobs in any of
-these states simd will pick up where it left off. 

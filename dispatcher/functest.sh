@@ -187,7 +187,7 @@ startDispatcher() {
         #-------------------------------------------------------
         # start a new dispatcher with a clean database table
         #-------------------------------------------------------
-        echo "DROP TABLE IF EXISTS Queue;" | ${MYSQL} simq
+        echo "DROP TABLE IF EXISTS Queue;" | ${MYSQL} simqtest
         rm -rf qdconfigs
 
         ./dispatcher >DISPATCHER.log 2>&1 &

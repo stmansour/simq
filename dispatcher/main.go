@@ -53,7 +53,7 @@ func doMain() {
 	if err != nil {
 		log.Fatalf("Failed to read external resources: %v", err)
 	}
-	cmd := ex.GetSQLOpenString("simq")
+	cmd := ex.GetSQLOpenString(ex.DbName)
 	setMyNetworkAddress()
 
 	app.qm, err = data.NewQueueManager(cmd)
@@ -61,7 +61,7 @@ func doMain() {
 		log.Fatalf("Failed to initialize queue manager: %v", err)
 	}
 
-	app.SimResultsDir = "/opt/simulation-results"
+	app.SimResultsDir = ex.SimResultsDir
 
 	srvAddr := fmt.Sprintf(":%d", app.port)
 	mux := http.NewServeMux()

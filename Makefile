@@ -73,6 +73,7 @@ release:
 
 refmt:
 	fmt design.txt > design.txt1 ; mv design.txt1 design.txt
+	fmt systemdesign.txt > systemdesign.txt1 ; mv systemdesign.txt1 systemdesign.txt
 
 install-tools:
 	go get -u github.com/go-sql-driver/mysql

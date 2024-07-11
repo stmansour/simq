@@ -156,7 +156,7 @@ if [[ "${SINGLETEST}${TFILES}" = "${TFILES}" || "${SINGLETEST}${TFILES}" = "${TF
     #-------------------------------------------------------
     # start a new dispatcher with a clean database table
     #-------------------------------------------------------
-    echo "DROP TABLE IF EXISTS Queue;" | ${MYSQL} simq
+    echo "DROP TABLE IF EXISTS Queue;" | ${MYSQL} simqtest
     ./dispatcher >DISPATCHER.log 2>&1 &
     DISPATCHER_PID=$!
     echo "Started dispatcher with PID: ${DISPATCHER_PID}" >> ${RESFILE}

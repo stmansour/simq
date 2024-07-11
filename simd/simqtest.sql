@@ -1,6 +1,6 @@
 -- MySQL dump 10.13  Distrib 8.0.30, for macos12 (arm64)
 --
--- Host: localhost    Database: simq
+-- Host: localhost    Database: simqtest
 -- ------------------------------------------------------
 -- Server version	8.0.30
 

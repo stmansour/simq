@@ -28,7 +28,7 @@ func initTest(t *testing.T) (*data.QueueManager, error) {
 		t.Errorf("Failed to read external resources: %v", err)
 		return nil, err
 	}
-	cmd := ex.GetSQLOpenString("simq")
+	cmd := ex.GetSQLOpenString("simqtest")
 
 	// Initialize the queue manager
 	qm, err := data.NewQueueManager(cmd)

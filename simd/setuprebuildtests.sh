@@ -1,4 +1,4 @@
-#~/bin/bash
+#!/bin/bash
 #
 #  THE TEST HERE CAN DO MAJOR DAMAGE BY DELETING IMPORTANT
 #  DATA IF IT RUNS ON THE WRONG MACHINES.
@@ -45,7 +45,7 @@ for name in "${allowableNames[@]}"; do
     fi
 done
 
-if (( ${ALLOW} != 1 )); then
+if (( ALLOW != 1 )); then
     cat << MEOF
 This host is not in the list of hosts where running this script is allowed.
 It is possible to lose critical data if it is run on the wrong machine.
@@ -67,13 +67,13 @@ tar xvf sims.tar
 echo "-------------------------------------------------------------"
 echo "|  Resetting dispatcher queue"
 echo "-------------------------------------------------------------"
-/usr/local/mysql/bin/mysql simq < simq.sql
-echo "SELECT * FROM Queue;" | /usr/local/mysql/bin/mysql simq
+/usr/local/mysql/bin/mysql simqtest < simqtest.sql
+echo "SELECT * FROM Queue;" | /usr/local/mysql/bin/mysql simqtest
 
 echo "-------------------------------------------------------------"
-echo "|  Resetting /opt/simulation-results directory"
+echo "|  Resetting /opt/TestSimResultsRepo directory"
 echo "-------------------------------------------------------------"
-rm -rf /opt/simulation-results/2024
+rm -rf /opt/TestSimResultsRepo/2024
 
 echo "-------------------------------------------------------------"
 echo "|  Resetting dispatcher's qdconfigs directory"

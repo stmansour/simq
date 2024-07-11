@@ -12,13 +12,14 @@ import (
 // ExternalResources is used to store sensitive or secret config values
 // for gaining access to external resources.
 type ExternalResources struct {
-	Env    int // 0 = dev, 1 = qa, 2 = production
-	DbUser string
-	DbName string
-	DbPass string
-	DbHost string
-	DbPort int
-	DbType string
+	Env           int    // 0 = dev, 1 = qa, 2 = production
+	DbUser        string // database user
+	DbName        string // database name
+	DbPass        string // database password
+	DbHost        string // database host
+	DbPort        int    // database port
+	DbType        string // mysql or postgres or sqlite or ...
+	SimResultsDir string // directory to store simulation results
 }
 
 // Define constant variables for DEV, QA, and PROD as per corrected mapping
@@ -74,7 +75,7 @@ func ReadExternalResources() (*ExternalResources, error) {
 	//---------------------------------------------
 	var resources = ExternalResources{
 		DbHost: "localhost",
-		DbName: "plato",
+		DbName: "simqtest",
 		DbPort: 3306,
 		DbType: "mysql",
 	}
