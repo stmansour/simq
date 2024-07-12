@@ -60,8 +60,10 @@ func main() {
 	sid := flag.Int64("sid", 0, "Simulation ID for delete action")
 
 	if err := util.LoadHomeDirConfig(".psqrc", &app); err != nil {
-		fmt.Printf("Error loading config file: %v\n", err)
-		return
+		if ! strings.Contains(err.Error(),"no such file or directory") {
+		    fmt.Printf("Error loading config file: %v\n", err)
+		    return
+		}
 	}
 
 	flag.Parse()
