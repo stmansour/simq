@@ -67,8 +67,9 @@ stats:
 	@find . -name "*.go" | srcstats
 
 release:
-	cp -r dist/simq /usr/local/simq/;cd /usr/local/simq;rm -rf bin;mv simq bin;
-	if [ -d /usr/local/share/man/man1 ] && [ -w /usr/local/share/man/man1 ]; then cp ./dist/simq/man/man1/* /usr/local/share/man/man1/ ; fi
+	mkdir -p /usr/local/simq/bin
+	cp -r dist/simq/psq /usr/local/simq/bin/
+	# if [ -d /usr/local/share/man/man1 ] && [ -w /usr/local/share/man/man1 ]; then cp ./dist/simq/man/man1/* /usr/local/share/man/man1/ ; fi
 	@echo "*** RELEASED TO:  /usr/local/simq/bin ***"
 
 refmt:
