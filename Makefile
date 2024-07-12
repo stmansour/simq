@@ -5,10 +5,15 @@ TEST_FAILURE_FILE=fail
 # Temporary file for storing start time
 TIMER_FILE := .build_timer
 
-.PHONY: install-tools golint staticcheck test
+.PHONY: install-tools golint staticcheck test deps
 
 doit:
 	for dir in $(DIRS); do make -C $$dir;done
+
+deps:
+	go mod download
+	go mod tidy
+
 
 clean:
 	rm -rf dist

@@ -1,15 +1,3 @@
-// Mac:
-//  system_profiler SPHardwareDataType
-//  sysctl -n machdep.cpu.brand_string
-//  sysctl -n hw.ncpu
-//
-// Linux:
-//  lscpu
-//  nproc
-//
-// Windows:
-//  wmic cpu get name,NumberOfCores,NumberOfLogicalProcessors,MaxClockSpeed
-//  systeminfo | findstr /C:"Processor"
 {
     "CPUs": 10,
     "Memory": "64GB",

@@ -44,3 +44,19 @@ simulations, and stopsim, which instructs the simulator to halt
 after the current generation completes. This facilitates monitoring
 and managing long-running simulations, ensuring efficient use of
 resources and timely adjustments as needed.
+
+
+RELEASE LOCATIONS
+=================
+
+Program        Release Directory          Private Directory
+-------------- -------------------------- ---------------------------
+dispatcher     /usr/local/simq/dispatcher /var/lib/dispatcher
+gfetch         /usr/ocal/plato/bin
+gsync          /usr/ocal/plato/bin
+psq            /usr/local/simq/bin
+psync          /usr/local/plato/bin
+simulator      /usr/local/plato/bin
+simd           /usr/local/simq/simd       /var/lib/simd
+simtalk        /usr/local/plato/bin
+sqltocsv       /usr/local/plato/bin

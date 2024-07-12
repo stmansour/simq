@@ -29,9 +29,10 @@ type DCommand struct {
 }
 
 var app struct {
-	action string
-	file   string
-	sid    int64
+	action        string
+	file          string
+	sid           int64
+	DispatcherURL string
 }
 
 // Commands represents the list of commands
@@ -51,12 +52,23 @@ func init() {
 }
 
 func main() {
+	app.DispatcherURL = "http://192.168.5.100:8250/" // default dispatcher URL is on plato server
+
 	action := flag.String("action", "", "Action to perform: add, list, delete")
+	dsp := flag.String("d", "", "URL to dispatcher, default: "+app.DispatcherURL)
 	file := flag.String("file", "config.json5", "Path to config file (default: config.json5)")
 	sid := flag.Int64("sid", 0, "Simulation ID for delete action")
 
+	if err := util.LoadHomeDirConfig(".psqrc", &app); err != nil {
+		fmt.Printf("Error loading config file: %v\n", err)
+		return
+	}
+
 	flag.Parse()
 	app.action = *action
+	if len(*dsp) > 0 {
+		app.DispatcherURL = *dsp
+	}
 
 	usr, err := user.Current()
 	if err != nil {
@@ -86,6 +98,7 @@ func main() {
 		case "delete":
 			line += " " + strconv.Itoa(int(*sid))
 		}
+		handleCmd(line, cmd)
 	}
 
 	// Start interactive mode

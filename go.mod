@@ -5,6 +5,7 @@ go 1.22
 require (
 	github.com/chzyer/readline v1.5.1
 	github.com/go-sql-driver/mysql v1.8.1
+	github.com/mitchellh/go-homedir v1.1.0
 	github.com/stretchr/testify v1.9.0
 	github.com/yosuke-furukawa/json5 v0.1.1
 )
