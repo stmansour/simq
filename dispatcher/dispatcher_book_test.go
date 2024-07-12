@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -101,7 +102,8 @@ func generateNewSimulation(t *testing.T) {
 	//---------------------------
 	// VALIDATE FILE CREATED...
 	//---------------------------
-	expectedFile := fmt.Sprintf("qdconfigs/%d/config.json5", statResp.ID)
+	// expectedFile := fmt.Sprintf("%s/%d/config.json5", app.QdConfigsDir, statResp.ID)
+	expectedFile := filepath.Join(app.QdConfigsDir, fmt.Sprintf("%d", statResp.ID), "config.json5")
 	if _, err := os.Stat(expectedFile); os.IsNotExist(err) {
 		t.Errorf("Expected file %s to be saved, but it does not exist", expectedFile)
 	} else if err != nil {

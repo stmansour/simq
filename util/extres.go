@@ -2,6 +2,7 @@ package util
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -12,14 +13,16 @@ import (
 // ExternalResources is used to store sensitive or secret config values
 // for gaining access to external resources.
 type ExternalResources struct {
-	Env           int    // 0 = dev, 1 = qa, 2 = production
-	DbUser        string // database user
-	DbName        string // database name
-	DbPass        string // database password
-	DbHost        string // database host
-	DbPort        int    // database port
-	DbType        string // mysql or postgres or sqlite or ...
-	SimResultsDir string // directory to store simulation results
+	Env                int    // 0 = dev, 1 = qa, 2 = production
+	DbUser             string // database user
+	DbName             string // database name
+	DbPass             string // database password
+	DbHost             string // database host
+	DbPort             int    // database port
+	DbType             string // mysql or postgres or sqlite or ...
+	SimResultsDir      string // directory to store simulation results
+	DispatcherQueueDir string // where dispatcher stores queued configs
+	SimdSimulationsDir string // where simulator stores simulations
 }
 
 // Define constant variables for DEV, QA, and PROD as per corrected mapping
@@ -97,7 +100,7 @@ func ReadExternalResources() (*ExternalResources, error) {
 			}
 			found = true
 
-			fname = exdir + "/" + fname
+			fname = filepath.Join(exdir, fname)
 			if _, err = os.Stat(fname); err != nil {
 				if !os.IsNotExist(err) {
 					return &resources, err // error is something other than "doesn't exist"
@@ -132,6 +135,53 @@ func ReadExternalResources() (*ExternalResources, error) {
 	}
 
 	return &resources, nil
+}
+
+// LoadConfig reads the contents of config.json5 and fills the ExternalResources struct.
+func LoadConfig(extres *ExternalResources, fname string) (*ExternalResources, error) {
+	var found bool
+	if _, err := os.Stat(fname); err != nil {
+		if os.IsNotExist(err) {
+			// check for it in the executable directory...
+			exdir, err := GetExecutableDir()
+			if err != nil {
+				return extres, err
+			}
+			found = true
+
+			fname = filepath.Join(exdir, fname)
+			if _, err = os.Stat(fname); err != nil {
+				if !os.IsNotExist(err) {
+					return extres, err // error is something other than "doesn't exist"
+				}
+				found = false
+			}
+		}
+
+		if !found {
+			return extres, err
+		}
+	}
+
+	configFile, err := os.Open(fname)
+	if err != nil {
+		return extres, fmt.Errorf("failed to open config file: %v", err)
+	}
+	defer configFile.Close()
+	byteValue, err := io.ReadAll(configFile)
+	if err != nil {
+		return extres, fmt.Errorf("failed to read config file: %v", err)
+	}
+
+	//-------------------------------------
+	// read into our config struct
+	//-------------------------------------
+	err = json5.Unmarshal(byteValue, extres)
+	if err != nil {
+		return extres, fmt.Errorf("failed to unmarshal config data into cfg: %v", err)
+	}
+
+	return extres, nil
 }
 
 // GetExecutableDir returns the directory containing the executable that started the current process.

@@ -26,6 +26,7 @@ var app struct {
 	HexASCIIDbg   bool // if true print reply buffers in hex and ASCII
 	HTTPHdrsDbg   bool // if true print HTTP headers
 	SimResultsDir string
+	QdConfigsDir  string
 }
 
 func readCommandLineArgs() {
@@ -53,6 +54,10 @@ func doMain() {
 	if err != nil {
 		log.Fatalf("Failed to read external resources: %v", err)
 	}
+	if ex, err = util.LoadConfig(ex, "dispatcher.json5"); err != nil {
+		log.Fatalf("Failed to load config: %v", err)
+	}
+
 	cmd := ex.GetSQLOpenString(ex.DbName)
 	setMyNetworkAddress()
 
@@ -62,6 +67,7 @@ func doMain() {
 	}
 
 	app.SimResultsDir = ex.SimResultsDir
+	app.QdConfigsDir = ex.DispatcherQueueDir
 
 	srvAddr := fmt.Sprintf(":%d", app.port)
 	mux := http.NewServeMux()

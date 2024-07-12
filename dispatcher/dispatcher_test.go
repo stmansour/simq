@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -28,6 +29,12 @@ func initTest(t *testing.T) (*data.QueueManager, error) {
 		t.Errorf("Failed to read external resources: %v", err)
 		return nil, err
 	}
+	if ex, err = util.LoadConfig(ex, "dispatcher.json5"); err != nil {
+		t.Errorf("Failed to load config: %v", err)
+		return nil, err
+	}
+	app.QdConfigsDir = ex.DispatcherQueueDir
+
 	cmd := ex.GetSQLOpenString("simqtest")
 
 	// Initialize the queue manager
@@ -211,7 +218,7 @@ func TestHandleDeleteItem(t *testing.T) {
 	//----------------------------------------
 	// CREATE CONFIG FILE FOR THE NEW ITEM
 	//----------------------------------------
-	dirPath := fmt.Sprintf("qdconfigs/%d", sid)
+	dirPath := filepath.Join(app.QdConfigsDir, fmt.Sprintf("%d", sid))
 	err = os.MkdirAll(dirPath, os.ModePerm)
 	if err != nil {
 		t.Fatalf("Failed to create directory: %v", err)

@@ -6,7 +6,9 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -41,7 +43,13 @@ func RebuildSimulatorList() error {
 		return fmt.Errorf("failed to marshal book request: %v", err)
 	}
 	cmd.Data = json.RawMessage(dataBytes)
-	url := fmt.Sprintf("%scommand", app.cfg.DispatcherURL)
+
+	parsedURL, err := url.Parse(app.cfg.DispatcherURL)
+	if err != nil {
+		return fmt.Errorf("failed to parse base URL: %v", err)
+	}
+	parsedURL.Path = path.Join(parsedURL.Path, "command")
+	url := parsedURL.String()
 	body := util.SendRequest(url, &cmd)
 
 	//-----------------------------------------------------------

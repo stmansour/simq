@@ -55,14 +55,19 @@ MEOF
     exit 1
 fi
 
+SIMULATIONSDIR=$(grep "SimdSimulationsDir" simdconf.json5| sed 's/".*"://' | sed 's/[", ]//g')
+RESULTSDIR=$(grep "SimResultsDir" simdconf.json5| sed 's/".*"://' | sed 's/[", ]//g')
+QDCONFIGSDIR=$(grep "DispatcherQueueDir" simdconf.json5| sed 's/".*"://' | sed 's/[", ]//g')
+# echo "SIMULATIONSDIR = ${SIMULATIONSDIR}, RESULTSDIR = ${RESULTSDIR}, QDCONFIGSDIR = ${QDCONFIGSDIR}"
+
 #---------------------
 # ON WITH IT!
 #---------------------
 echo "-------------------------------------------------------------"
 echo "|  Resetting simd's simulations directory"
 echo "-------------------------------------------------------------"
-rm -rf simulations
-tar xvf sims.tar
+rm -rf "${SIMULATIONSDIR:?}/*"
+tar xvf sims.tar -C "${SIMULATIONSDIR}/"
 
 echo "-------------------------------------------------------------"
 echo "|  Resetting dispatcher queue"
@@ -70,13 +75,13 @@ echo "-------------------------------------------------------------"
 /usr/local/mysql/bin/mysql simqtest < simqtest.sql
 echo "SELECT * FROM Queue;" | /usr/local/mysql/bin/mysql simqtest
 
-echo "-------------------------------------------------------------"
+echo "------------------------------------------------------------"
 echo "|  Resetting /opt/TestSimResultsRepo directory"
 echo "-------------------------------------------------------------"
-rm -rf /opt/TestSimResultsRepo/2024
+rm -rf "${RESULTSDIR:?}/*"
 
 echo "-------------------------------------------------------------"
 echo "|  Resetting dispatcher's qdconfigs directory"
 echo "-------------------------------------------------------------"
-rm -rf ../dispatcher/qdconfigs
-tar xvf qds.tar -C ../dispatcher/
+rm -rf "${QDCONFIGSDIR:?}/*"
+tar xvf qds.tar -C "${QDCONFIGSDIR}/"

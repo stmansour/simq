@@ -230,7 +230,7 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) { // 
 
 	//----------------------------------------------------------------------------
 	// BUILD THE DESTINATION DIRECTORY
-	// /opt/simulation-results/YYYY/MM/DD/SID/results.tar.gz
+	// /genome/simulation-results/YYYY/MM/DD/SID/results.tar.gz
 	//
 	// for testing: /opt/TestSimResultsRepo
 	//----------------------------------------------------------------------------
@@ -413,7 +413,7 @@ func handleBook(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	//-----------------------------------------------------------------------------
 	// FIND THE CONFIG FILE FOR THIS JOB
 	//-----------------------------------------------------------------------------
-	configDir := fmt.Sprintf("qdconfigs/%d", queueItem.SID)
+	configDir := fmt.Sprintf("%s/%d", app.QdConfigsDir, queueItem.SID)
 	configFilename, err := findConfigFile(configDir)
 	if err != nil {
 		SvcErrorReturn(w, fmt.Errorf("error finding config file: %s", err.Error()))
@@ -448,7 +448,7 @@ func handleBook(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	//----------------------------
 	// Config file part
 	//----------------------------
-	configFilePath := fmt.Sprintf("qdconfigs/%d/%s", queueItem.SID, response.ConfigFilename)
+	configFilePath := filepath.Join(app.QdConfigsDir, fmt.Sprintf("%d", queueItem.SID), response.ConfigFilename)
 	configFile, err := os.Open(configFilePath)
 	if err != nil {
 		SvcErrorReturn(w, fmt.Errorf("failed to open config file"))
@@ -521,7 +521,7 @@ func handleNewSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	//----------------------------------------------
 	// Create the directory if it doesn't exist
 	//----------------------------------------------
-	err = os.MkdirAll("qdconfigs", os.ModePerm)
+	err = os.MkdirAll("app.QdConfigsDir", os.ModePerm)
 	if err != nil {
 		LogAndErrorReturn(w, fmt.Errorf("failed to create directory: %v", err))
 		return
@@ -530,9 +530,9 @@ func handleNewSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	//----------------------------------------------
 	// Create a new file in the qdconfigs directory
 	//----------------------------------------------
-	tempFile, err := os.CreateTemp("qdconfigs", "config-*.json5")
+	tempFile, err := os.CreateTemp("app.QdConfigsDir", "config-*.json5")
 	if err != nil {
-		LogAndErrorReturn(w, fmt.Errorf("failed to create qdconfigs directory: %v", err))
+		LogAndErrorReturn(w, fmt.Errorf("failed to create directory %s: %v", app.QdConfigsDir, err))
 		return
 	}
 	defer tempFile.Close()
@@ -570,16 +570,17 @@ func handleNewSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	//----------------------------------------------
 	// Make the new directory
 	//----------------------------------------------
-	err = os.MkdirAll(fmt.Sprintf("qdconfigs/%d", sid), os.ModePerm)
+	fpath := filepath.Join(app.QdConfigsDir, fmt.Sprintf("%d", sid))
+	err = os.MkdirAll(fpath, os.ModePerm)
 	if err != nil {
-		LogAndErrorReturn(w, fmt.Errorf("failed to make directory qdconfigs/%d: %v", sid, err))
+		LogAndErrorReturn(w, fmt.Errorf("failed to make directory %s: %v", fpath, err))
 		return
 	}
 
 	//---------------------------------------------------------------------
 	// Rename the file to include the queue item ID and original filename
 	//---------------------------------------------------------------------
-	newFilePath := fmt.Sprintf("qdconfigs/%d/%s", sid, req.OriginalFilename)
+	newFilePath := filepath.Join(app.QdConfigsDir, fmt.Sprintf("%d", sid), req.OriginalFilename)
 	if err := os.Rename(tempFile.Name(), newFilePath); err != nil {
 		LogAndErrorReturn(w, fmt.Errorf("failed to rename %s to %s: %v", tempFile.Name(), newFilePath, err))
 		return
@@ -791,7 +792,7 @@ func handleDeleteItem(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	}
 
 	// Delete the file and directory associated with the queue item
-	dirPath := fmt.Sprintf("qdconfigs/%d", req.SID)
+	dirPath := filepath.Join(app.QdConfigsDir, fmt.Sprintf("%d", req.SID))
 	if err := os.RemoveAll(dirPath); err != nil {
 		LogAndErrorReturn(w, fmt.Errorf("failed to remove directory %s: %v", dirPath, err))
 		return
