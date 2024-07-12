@@ -1,0 +1,4 @@
+{
+    "DispatcherQueueDir": "/var/lib/dispatcher/qdconfigs",
+    "SimResultsDir": "/opt/TestSimResultsRepo",
+}
