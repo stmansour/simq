@@ -9,6 +9,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/stmansour/simq/util"
@@ -182,7 +183,7 @@ func bookAndRunSimulation(bkcmd string, sid int64) error {
 					return fmt.Errorf("failed to unmarshal book response: %v", err)
 				}
 			case "file":
-				configDir := fmt.Sprintf("simulations/%d", bookResp.SID)
+				configDir := filepath.Join(app.cfg.SimdSimulationsDir, "simulations", fmt.Sprintf("%d", bookResp.SID))
 				os.MkdirAll(configDir, os.ModePerm)
 				configPath := fmt.Sprintf("%s/%s", configDir, bookResp.ConfigFilename)
 
