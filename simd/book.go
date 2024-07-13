@@ -184,6 +184,7 @@ func bookAndRunSimulation(bkcmd string, sid int64) error {
 				}
 			case "file":
 				configDir := filepath.Join(app.cfg.SimdSimulationsDir, "simulations", fmt.Sprintf("%d", bookResp.SID))
+				fmt.Printf("BOOK CMD:  configDir = %s\n", configDir)
 				os.MkdirAll(configDir, os.ModePerm)
 				configPath := fmt.Sprintf("%s/%s", configDir, bookResp.ConfigFilename)
 

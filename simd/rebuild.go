@@ -249,7 +249,10 @@ func recoverBookedSimulation(qi *data.QueueItem) {
 	// just archive them and move on.
 	//---------------------------------------------------------------
 	if recovered, err := sim.recoverBasedOnFiles(); err != nil || recovered {
-		return // error occurred and logged
+		if ! strings.Contains(err.Error(),"no such file or directory" {
+		    return // error occurred and logged
+		}
+		fmt.Printf("simd >>>> booked simulation directory or config file does not exist in %s.\n", sim.Directory)
 	}
 
 	//------------------------------------------------------------------
@@ -259,7 +262,6 @@ func recoverBookedSimulation(qi *data.QueueItem) {
 	configs, err := findJSON5Files(sim.Directory)
 	if err != nil {
 		log.Printf("Simulation: %d - error occurred lookng for config file in %s: error: %v\n", qi.SID, sim.Directory, err)
-		return
 	}
 
 	//---------------------------------------------------

@@ -37,8 +37,8 @@ package:
 release: config
 	mkdir -p /usr/local/simq/dispatcher/
 	cp dispatcher /usr/local/simq/dispatcher/
-	cp dispatcher.json5 /usr/local/simq/dispatcher/
-	cp extres.json5 /usr/local/simq/dispatcher/
+	# cp dispatcher.json5 /usr/local/simq/dispatcher/
+	# cp extres.json5 /usr/local/simq/dispatcher/
 
 releaseman:
 	if [ -d /usr/local/share/man/man1 ] && [ -w /usr/local/share/man/man1 ]; then cp dispatcher.1 /usr/local/share/man/man1/ ; fi
