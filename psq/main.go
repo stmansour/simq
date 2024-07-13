@@ -52,7 +52,7 @@ func init() {
 }
 
 func main() {
-	app.DispatcherURL = "http://192.168.5.100:8250/" // default dispatcher URL is on plato server
+	app.DispatcherURL = "http://216.16.195.147:8250/" // default dispatcher URL is on plato server
 
 	action := flag.String("action", "", "Action to perform: add, list, delete")
 	dsp := flag.String("d", "", "URL to dispatcher, default: "+app.DispatcherURL)
