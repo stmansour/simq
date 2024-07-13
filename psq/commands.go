@@ -33,7 +33,6 @@ type Config struct {
 
 const (
 	defaultPriority = 5
-	defaultURL      = "http://localhost:8250/command"
 )
 
 func addJob(cmd *CmdData, args []string) {
@@ -59,7 +58,7 @@ func addJob(cmd *CmdData, args []string) {
 		Data:     json.RawMessage(dataBytes),
 	}
 
-	resp, err := util.SendMultipartRequest(defaultURL, &command, file)
+	resp, err := util.SendMultipartRequest(app.DispatcherURL, &command, file)
 	if err != nil {
 		fmt.Printf("Error sending request: %v\n", err)
 	}
@@ -169,7 +168,7 @@ func deleteJob(cmd *CmdData, args []string) {
 		Data:     json.RawMessage(dataBytes),
 	}
 
-	resp := util.SendRequest(defaultURL, &command)
+	resp := util.SendRequest(app.DispatcherURL, &command)
 	if resp != nil {
 		fmt.Printf("Delete Job Response: %s\n", string(resp))
 	}
