@@ -130,7 +130,9 @@ func interactiveMode(cmd *CmdData) {
 	}
 	defer rl.Close()
 
-	fmt.Printf("PSQ Version %s\nType 'help' for a command list, Up Arrow for previous command, and Down Arrow for next command.\n", util.Version())
+	fmt.Printf("PSQ Version %s\n", util.Version())
+  fmt.Printf("Targeting Dispatcher at: %s\n",app.DispatcherURL)
+	fmt.Printf("Type 'help' for a command list, Up Arrow for previous command, and Down Arrow for next command.\n")
 
 	for {
 		line, err := rl.Readline()
