@@ -36,7 +36,7 @@ type Simulation struct {
 //
 // -----------------------------------------------------------------------------
 func startSimulator(sid int64, FQConfigFileName string) error {
-	fmt.Printf("Starting simulation %d\n", sid)
+	log.Printf("Starting simulation %d\n", sid)
 	//-------------------------------------------------------------
 	// Start the simulator
 	// Simulator needs to run in ./simulator/<sid>/
@@ -46,7 +46,7 @@ func startSimulator(sid int64, FQConfigFileName string) error {
 	cmd := exec.Command("/usr/local/plato/bin/simulator",
 		"-c", FQConfigFileName,
 		"-SID", fmt.Sprintf("%d", sid),
-		"-DISPATCHER", app.cfg.DispatcherURL)
+		"-DISPATCHER", app.cfg.DispatcherURL) // note: we pass the base url to simulator, not the fully qualified url
 
 	//----------------------------------------------
 	// Set the working directory for the command
@@ -80,7 +80,7 @@ func startSimulator(sid int64, FQConfigFileName string) error {
 		return fmt.Errorf("failed to start simulator: %v", err)
 	}
 
-	fmt.Printf("simulator started\n")
+	log.Printf("startSimulator: simulator started\n")
 
 	//----------------------------------------------
 	// Detach the process. We don't want it to stop
@@ -91,7 +91,7 @@ func startSimulator(sid int64, FQConfigFileName string) error {
 	}
 	outputFile.Close()
 
-	fmt.Printf("simulator process released\n")
+	log.Printf("startSimulator: simulator process released\n")
 
 	//---------------------------------------------------------------
 	// we have a new simulation in process. Add it to the list...
@@ -113,7 +113,7 @@ func startSimulator(sid int64, FQConfigFileName string) error {
 
 // Monitor the simulator process
 func monitorSimulator(sim *Simulation) {
-	fmt.Printf("simd >>>>  %d\n", sim.SID)
+	log.Printf("simd >>>>  %d\n", sim.SID)
 	//-------------------------------------------------------------
 	// First thing to do is get the first line of its log file.
 	// But let's wait 3 seconds to give it time to startup
@@ -130,12 +130,12 @@ func monitorSimulator(sim *Simulation) {
 	//-------------------------------------------------------------------------------
 	startIndex := strings.Index(firstLine, "http://")
 	if startIndex == -1 {
-		fmt.Println("No HTTP address found")
+		log.Println("No HTTP address found")
 		return
 	}
 	sim.URL = firstLine[startIndex:]
 
-	fmt.Printf("simd >>>> Simulator @ %s\n", sim.URL)
+	log.Printf("simd >>>> Simulator @ %s\n", sim.URL)
 
 	//-------------------------------------------------------------
 	// Create a ticker that triggers every 5 minutes
@@ -150,7 +150,7 @@ func monitorSimulator(sim *Simulation) {
 	// Periodically ping the simulator to check its status
 	//-------------------------------------------------------------
 	for range ticker.C {
-		// fmt.Printf("simd >>>> ticker loop >>>> Simulator @ %s is still running\n", sim.URL)
+		// log.Printf("simd >>>> ticker loop >>>> Simulator @ %s is still running\n", sim.URL)
 		if !sim.isSimulatorRunning() {
 			log.Printf("Simulator @ %s is no longer running", sim.URL)
 			break
@@ -160,12 +160,12 @@ func monitorSimulator(sim *Simulation) {
 	// Simulator has finished. Verify status with dispatcher. If
 	// all is well, then transmit files to the dispatcher
 	//-------------------------------------------------------------
-	fmt.Printf("Simulator @ %s is no longer running.\n", sim.URL)
+	log.Printf("Simulator @ %s is no longer running.\n", sim.URL)
 	if err = sim.archiveSimulationResults(); err != nil {
 		log.Printf("Failed to archive simulation results: %v", err)
 		return
 	}
-	fmt.Printf("Archived simulation results to %s\n", sim.Directory)
+	log.Printf("Archived simulation results to %s\n", sim.Directory)
 
 	//-----------------------------------------
 	// Send the results to the dispatcher

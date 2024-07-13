@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -50,6 +51,22 @@ func setMyNetworkAddress() {
 }
 
 func doMain() {
+	//-----------------------------------------
+	// OUTPUT MESSAGES TO A LOGFILE
+	//-----------------------------------------
+	exdir, err := util.GetExecutableDir()
+	if err != nil {
+		log.Fatalf("Failed to get executable directory: %v", err)
+	}
+
+	fname := filepath.Join(exdir, "dispatcher.log")
+	logFile, err := os.OpenFile(fname, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	if err != nil {
+		log.Fatalf("Failed to open log file: %v", err)
+	}
+	defer logFile.Close()
+	log.SetOutput(logFile)
+
 	ex, err := util.ReadExternalResources()
 	if err != nil {
 		log.Fatalf("Failed to read external resources: %v", err)

@@ -6,9 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
-	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -24,6 +22,7 @@ import (
 // -----------------------------------------------------------------------------
 func RebuildSimulatorList() error {
 	var err error
+	var dataBytes []byte
 	//----------------------------------------------------------------------
 	// DOES DISPATCHER HAVE ANY "IN-PROGRESS" SIMULATIONS FOR THIS MACHINE?
 	//----------------------------------------------------------------------
@@ -34,23 +33,14 @@ func RebuildSimulatorList() error {
 	var cmdDataStruct struct {
 		MachineID string
 	}
-	cmdDataStruct.MachineID, err = util.GetMachineUUID()
-	if err != nil {
+	if cmdDataStruct.MachineID, err = util.GetMachineUUID(); err != nil {
 		return fmt.Errorf("failed to get machine ID: %v", err)
 	}
-	dataBytes, err := json.Marshal(cmdDataStruct)
-	if err != nil {
+	if dataBytes, err = json.Marshal(cmdDataStruct); err != nil {
 		return fmt.Errorf("failed to marshal book request: %v", err)
 	}
 	cmd.Data = json.RawMessage(dataBytes)
-
-	parsedURL, err := url.Parse(app.cfg.DispatcherURL)
-	if err != nil {
-		return fmt.Errorf("failed to parse base URL: %v", err)
-	}
-	parsedURL.Path = path.Join(parsedURL.Path, "command")
-	url := parsedURL.String()
-	body := util.SendRequest(url, &cmd)
+	body := util.SendRequest(app.cfg.FQDispatcherURL, &cmd)
 
 	//-----------------------------------------------------------
 	// UNMARSHAL THE RESPONSE.  This gives us the list of jobs
@@ -63,10 +53,10 @@ func RebuildSimulatorList() error {
 	err = json.Unmarshal(body, &resp)
 	if err != nil {
 		if strings.Contains(err.Error(), "unexpected end of JSON input") {
-			fmt.Printf("dispatcher has no jobs currently pending on this machine\n")
+			log.Printf("dispatcher has no jobs currently pending on this machine\n")
 			return nil
 		}
-		fmt.Printf("Error unmarshaling response: %v\n", err)
+		log.Printf("Error unmarshaling response: %v\n", err)
 	}
 
 	//-----------------------------------------------------------------
@@ -97,18 +87,18 @@ func RebuildSimulatorList() error {
 	// DEBUG
 	//------------------
 	if len(dirs) > 0 {
-		fmt.Printf("SIMD: dispatcher reports %d simulations belonging to this machine\n", len(resp.Data))
+		log.Printf("SIMD: dispatcher reports %d simulations belonging to this machine\n", len(resp.Data))
 		s := "      SIDs = "
 		for i := 0; i < len(resp.Data); i++ {
 			s += fmt.Sprintf("%d ", resp.Data[i].SID)
 		}
-		fmt.Printf("%s\n", s)
-		fmt.Printf("SIMD: these SID simulation directories are in simd's simulation directory:\n")
+		log.Printf("%s\n", s)
+		log.Printf("SIMD: these SID simulation directories are in simd's simulation directory:\n")
 		s = "      DIRS = "
 		for i := 0; i < len(dirs); i++ {
 			s += fmt.Sprintf("%s ", dirs[i].Dir)
 		}
-		fmt.Printf("%s\n", s)
+		log.Printf("%s\n", s)
 	}
 
 	//---------------------------------------------------------------------------
@@ -121,7 +111,7 @@ func RebuildSimulatorList() error {
 				continue // not a number
 			}
 			if resp.Data[i].SID == sid {
-				fmt.Printf("Found simulation to recover: %d\n", resp.Data[i].SID)
+				log.Printf("Found simulation to recover: %d\n", resp.Data[i].SID)
 				dirs[j].InDispatcher = true // this dispatcher simulation is in our simulations directory
 				break
 			}
@@ -167,13 +157,13 @@ func RebuildSimulatorList() error {
 // existing simulator or restart it.
 // ------------------------------------------------------------------------------
 func recoverExecutingSimulation(qi *data.QueueItem) {
-	fmt.Printf("simd >>>> attempting to recover an executing simulation, sid = %d\n", qi.SID)
+	log.Printf("simd >>>> attempting to recover an executing simulation, sid = %d\n", qi.SID)
 	//----------------------------------------------
 	// IS THE SIMULATOR FOR THIS JOB STILL RUNNING?
 	//----------------------------------------------
 	sim := buildSimFromQueueItem(qi)
 	if sim.FindRunningSimulator() {
-		fmt.Printf("simd >>>> recovered running simulator for sid = %d\n", sim.SID)
+		log.Printf("simd >>>> recovered running simulator for sid = %d\n", sim.SID)
 		return
 	}
 
@@ -188,7 +178,7 @@ func recoverExecutingSimulation(qi *data.QueueItem) {
 	//----------------------------------------------------------------
 	// IF THE FILES ARE NOT THERE, WE NEED TO RESTART THE SIMULATOR
 	//----------------------------------------------------------------
-	fmt.Printf("simd >>>> rebooking sid = %d\n", sim.SID)
+	log.Printf("simd >>>> rebooking sid = %d\n", sim.SID)
 	bookAndRunSimulation("Rebook", sim.SID)
 }
 
@@ -232,6 +222,8 @@ func recoverArchiveSimResults(qi *data.QueueItem) {
 		log.Printf("Failed to send end simulation request: %v", err)
 		return
 	}
+
+	log.Printf("simd >>>> Simulation: %d - results archived in %s\n", sim.SID, sim.Directory)
 }
 
 // recoverBookedSimulation - In this case, the simulation was booked but
@@ -239,7 +231,7 @@ func recoverArchiveSimResults(qi *data.QueueItem) {
 // -------------------------------------------------------------------------
 func recoverBookedSimulation(qi *data.QueueItem) {
 	sim := buildSimFromQueueItem(qi)
-	fmt.Printf("simd >>>> attempting to recover a booked simulation, sid = %d\n", qi.SID)
+	log.Printf("simd >>>> attempting to recover a booked simulation, sid = %d\n", qi.SID)
 
 	//-----------------------------------------------------------------
 	// Because I've seen it happen, just check to see if the simulator
@@ -252,7 +244,7 @@ func recoverBookedSimulation(qi *data.QueueItem) {
 		if !strings.Contains(err.Error(), "no such file or directory") {
 			return // error occurred and logged
 		}
-		fmt.Printf("simd >>>> booked simulation directory or config file does not exist in %s.\n", sim.Directory)
+		log.Printf("simd >>>> booked simulation directory or config file does not exist in %s.\n", sim.Directory)
 	}
 
 	//------------------------------------------------------------------
@@ -286,7 +278,7 @@ func recoverBookedSimulation(qi *data.QueueItem) {
 	//-----------------------------------------------------------------------
 	// No finrep.csv file found. So, either the simulation is still running
 	// or the simulator was terminated before the simulation completed.
-	// First check to make, see if the simulation is still running. It does
+	// First check to see if the simulation is still running. It does
 	// not matter if there is a sim.log file in the directory. The process
 	// may still be running or it may have died. We don't know. But, either
 	// either way we will need to try to contact the running simulator if it
@@ -345,9 +337,10 @@ func logNotListening(notlistening []int) {
 // If it finds the simulator running it will return true. Otherwise it returns false
 // --------------------------------------------------------------------------------
 func (sim *Simulation) FindRunningSimulator() bool {
-	//-------------------------------
-	// SEARCH ALL POSSIBLE PORTS
-	//-------------------------------
+	//---------------------------------------------
+	// SEARCH ALL POSSIBLE PORTS ON THIS MACHINE
+	// (use of http://127.0.0.1/ is ok in this case)
+	//---------------------------------------------
 	notlistening := []int{}
 	for port := 8090; port <= 8100; port++ {
 		url := fmt.Sprintf("http://127.0.0.1:%d/status", port)

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -72,25 +73,25 @@ func PrintHexAndASCII(buffer []byte, maxChars int) {
 		// Print hex values
 		for j := 0; j < 16; j++ {
 			if i+j < maxChars {
-				fmt.Printf("%02X ", buffer[i+j])
+				log.Printf("%02X ", buffer[i+j])
 			} else {
-				fmt.Print("   ")
+				log.Print("   ")
 			}
 		}
 
 		// Print ASCII values
-		fmt.Print(" | ")
+		log.Print(" | ")
 		for j := 0; j < 16; j++ {
 			if i+j < maxChars {
 				b := buffer[i+j]
 				if unicode.IsPrint(rune(b)) {
-					fmt.Printf("%c", b)
+					log.Printf("%c", b)
 				} else {
-					fmt.Print(".")
+					log.Print(".")
 				}
 			}
 		}
-		fmt.Println()
+		log.Println()
 	}
 }
 

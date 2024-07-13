@@ -23,7 +23,6 @@ func (sim *Simulation) sendEndSimulationRequest() error {
 	//---------------------
 	// INITIALIZE...
 	//---------------------
-	url := fmt.Sprintf("%scommand", app.cfg.DispatcherURL)
 	username := "simd"
 	sid := sim.SID
 	filePath := sim.Directory
@@ -86,7 +85,7 @@ func (sim *Simulation) sendEndSimulationRequest() error {
 	//------------------------------------
 	// Send the request
 	//------------------------------------
-	req, err := http.NewRequest("POST", url, body)
+	req, err := http.NewRequest("POST", app.cfg.FQDispatcherURL, body)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}

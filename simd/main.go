@@ -3,7 +3,10 @@ package main
 import (
 	"flag"
 	"log"
+	"net/url"
 	"os"
+	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -24,6 +27,7 @@ type SimdConfig struct {
 	CPUArchitecture    string
 	Availability       string
 	DispatcherURL      string
+	FQDispatcherURL    string
 	SimdURL            string
 	MaxSimulations     int    // maximum number of simulations this machine can run
 	SimdSimulationsDir string // directory where simulations are stored
@@ -58,13 +62,28 @@ func readCommandLineArgs() {
 }
 
 func main() {
+	//-----------------------------------------
+	// OUTPUT MESSAGES TO A LOGFILE
+	//-----------------------------------------
+	exdir, err := util.GetExecutableDir()
+	if err != nil {
+		log.Fatalf("Failed to get executable directory: %v", err)
+	}
+
+	fname := filepath.Join(exdir, "simd.log")
+	logFile, err := os.OpenFile(fname, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	if err != nil {
+		log.Fatalf("Failed to open log file: %v", err)
+	}
+	defer logFile.Close()
+	log.SetOutput(logFile)
+
 	app.sims = make([]Simulation, 0) // initialize it empty
 
 	//-------------------------------------
 	// READ CONFIG
 	//-------------------------------------
-	err := loadConfig("simdconf.json5", &app.cfg)
-	if err != nil {
+	if err = loadConfig("simdconf.json5", &app.cfg); err != nil {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
 
@@ -87,7 +106,20 @@ func main() {
 		}
 		app.cfg.SimdURL = naddrs[i].IPAddress
 	}
+	log.Printf("\n-----------------------------------------------------------------\n")
 	log.Printf("SimdIP Address: %s\n", app.cfg.SimdURL)
+
+	//-------------------------------------
+	// SETUP THE DISPATCHER URL
+	//-------------------------------------
+	parsedURL, err := url.Parse(app.cfg.DispatcherURL)
+	if err != nil {
+		log.Printf("ERROR: failed to parse dispatcher base URL: %v", err)
+	}
+	app.cfg.DispatcherURL = parsedURL.String()
+	parsedURL.Path = path.Join(parsedURL.Path, "command")
+	app.cfg.FQDispatcherURL = parsedURL.String()
+	log.Printf("FQDispatcherURL: %s\n", app.cfg.FQDispatcherURL)
 
 	//-----------------------------------------------------
 	// SEE IF WE NEED TO RESTORE ANY INTERRUPTED JOBS...

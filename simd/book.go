@@ -98,8 +98,7 @@ func bookAndRunSimulation(bkcmd string, sid int64) error {
 	//----------------------------------------
 	// Create the URL to the dispatcher
 	//----------------------------------------
-	url := fmt.Sprintf("%scommand", app.cfg.DispatcherURL)
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(bookData))
+	req, err := http.NewRequest("POST", app.cfg.FQDispatcherURL, bytes.NewBuffer(bookData))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %v", err)
 	}
@@ -109,9 +108,9 @@ func bookAndRunSimulation(bkcmd string, sid int64) error {
 	// DEBUG:Print request headers
 	//----------------------------------------
 	if app.HTTPHdrsDbg {
-		fmt.Println("Request Headers:")
+		log.Println("Request Headers:")
 		for k, v := range req.Header {
-			fmt.Printf("%s: %s\n", k, v)
+			log.Printf("%s: %s\n", k, v)
 		}
 	}
 
@@ -136,7 +135,7 @@ func bookAndRunSimulation(bkcmd string, sid int64) error {
 	}
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println("Error reading response body:", err)
+		log.Println("Error reading response body:", err)
 		return err
 	}
 
@@ -155,7 +154,7 @@ func bookAndRunSimulation(bkcmd string, sid int64) error {
 	//-----------------------------------------------------------
 	contentType := resp.Header.Get("Content-Type")
 	if app.HTTPHdrsDbg {
-		fmt.Println("Response Content-Type:", contentType) // Debugging
+		log.Println("Response Content-Type:", contentType) // Debugging
 	}
 
 	var FQConfigFileName string
@@ -165,7 +164,7 @@ func bookAndRunSimulation(bkcmd string, sid int64) error {
 		//=========================================================
 		boundary := strings.Split(contentType, "boundary=")[1]
 		if app.HTTPHdrsDbg {
-			fmt.Println("Multipart boundary:", boundary) // Debugging
+			log.Println("Multipart boundary:", boundary) // Debugging
 		}
 		multipartReader := multipart.NewReader(bytes.NewReader(bodyBytes), boundary)
 
@@ -185,7 +184,7 @@ func bookAndRunSimulation(bkcmd string, sid int64) error {
 				}
 			case "file":
 				configDir := filepath.Join(app.cfg.SimdSimulationsDir, "simulations", fmt.Sprintf("%d", bookResp.SID))
-				fmt.Printf("BOOK CMD:  configDir = %s\n", configDir)
+				log.Printf("BOOK CMD:  configDir = %s\n", configDir)
 				os.MkdirAll(configDir, os.ModePerm)
 				FQConfigFileName = filepath.Join(configDir, bookResp.ConfigFilename)
 
@@ -197,7 +196,7 @@ func bookAndRunSimulation(bkcmd string, sid int64) error {
 				if _, err := io.Copy(out, part); err != nil {
 					return fmt.Errorf("failed to write config file: %v", err)
 				}
-				fmt.Printf("BOOK CMD: config file written: %s\n", FQConfigFileName)
+				log.Printf("BOOK CMD: config file written: %s\n", FQConfigFileName)
 			}
 		}
 		return startSimulator(bookResp.SID, FQConfigFileName)
@@ -213,11 +212,11 @@ func bookAndRunSimulation(bkcmd string, sid int64) error {
 			return fmt.Errorf(">>>> failed to unmarshal response: %v", err)
 		}
 		if respMessage.Message == "no items in queue" {
-			fmt.Printf(">>>> dispatcher has no items in the queue\n")
+			log.Printf(">>>> dispatcher has no items in the queue\n")
 			return nil // This is an expected response
 		} else if respMessage.Status != "success" {
 			if strings.Contains(respMessage.Message, "no items in queue") {
-				fmt.Printf(">>>> dispatcher has no items in the queue\n")
+				log.Printf(">>>> dispatcher has no items in the queue\n")
 				return nil
 			}
 			log.Printf("**** ERROR **** Failed to book simulation: %s", respMessage.Message)

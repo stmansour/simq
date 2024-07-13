@@ -226,7 +226,7 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) { // 
 		return
 	}
 
-	fmt.Printf("EndSimulation: SID: %d, Filename: %s\n", cmd.SID, cmd.Filename)
+	log.Printf("EndSimulation: SID: %d, Filename: %s\n", cmd.SID, cmd.Filename)
 
 	//----------------------------------------------------------------------------
 	// BUILD THE DESTINATION DIRECTORY
