@@ -28,31 +28,6 @@ type Simulation struct {
 	LastStatus SimulatorStatus
 }
 
-func createFQCWD() (string, error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-
-	// Resolve "." in the path if needed
-	if cwd == "." {
-		cwd, err = filepath.Abs(".") // Resolve "." to the absolute path of the cwd
-		if err != nil {
-			return "", err
-		}
-	}
-	return cwd, nil
-}
-func createFQDirName(cwd string, dirLevels []string) string {
-	fullPath := filepath.Join(cwd, filepath.Join(dirLevels...))
-	return fullPath
-}
-
-func createFQFilename(cwd string, fname string) string {
-	fullPath := filepath.Join(cwd, fname)
-	return fullPath
-}
-
 // Start the simulator with given SID and config file
 func startSimulator(sid int64, configFile string) error {
 	fmt.Printf("Starting simulation %d\n", sid)
@@ -60,14 +35,9 @@ func startSimulator(sid int64, configFile string) error {
 	// Start the simulator
 	// Simulator needs to run in ./simulator/<sid>/
 	//-------------------------------------------------------------
-	cwd, err := createFQCWD()
-	if err != nil {
-		return fmt.Errorf("failed to get current working directory: %v", err)
-	}
-	Directory := createFQDirName(cwd, []string{"simulations", fmt.Sprintf("%d", sid)})
-	cf := createFQFilename(Directory, configFile)
+	Directory := filepath.Join(app.cfg.SimdSimulationsDir, "simulations", fmt.Sprintf("%d", sid))
 	logFile := filepath.Join(Directory, "sim.log")
-
+	cf := filepath.Join(app.cfg.SimdSimulationsDir, configFile)
 	cmd := exec.Command("/usr/local/plato/bin/simulator",
 		"-c", cf,
 		"-SID", fmt.Sprintf("%d", sid),

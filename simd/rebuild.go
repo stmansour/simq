@@ -78,7 +78,7 @@ func RebuildSimulatorList() error {
 		InDispatcher bool
 	}
 	var dirs []DIR
-	dirPath := "./simulations"
+	dirPath := filepath.Join(app.cfg.SimdSimulationsDir, "simulations")
 	dir, err := os.ReadDir(dirPath)
 	if err != nil {
 		log.Fatal(err)
@@ -139,7 +139,8 @@ func RebuildSimulatorList() error {
 	for i := 0; i < len(dirs); i++ {
 		if !dirs[i].InDispatcher {
 			log.Printf("Deleting simulation not found in dispatcher: %s\n", dirs[i].Dir)
-			os.RemoveAll(fmt.Sprintf("./simulations/%s", dirs[i].Dir))
+			dir := filepath.Join(app.cfg.SimdSimulationsDir, "simulations", dirs[i].Dir)
+			os.RemoveAll(dir)
 		}
 	}
 
@@ -453,9 +454,10 @@ func getFilenamesInDir(dirPath string) ([]string, error) {
 // based on the information in the queue item.
 // ------------------------------------------------------------------------------
 func buildSimFromQueueItem(qi *data.QueueItem) Simulation {
+	dir := filepath.Join(app.cfg.SimdSimulationsDir, "simulations", fmt.Sprintf("%d", qi.SID))
 	sim := Simulation{
 		SID:        qi.SID,
-		Directory:  fmt.Sprintf("./simulations/%d", qi.SID),
+		Directory:  dir,
 		ConfigFile: qi.File,
 	}
 

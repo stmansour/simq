@@ -18,14 +18,16 @@ type SimulatorCommand struct {
 
 // SimdConfig is the configuration for the simulator
 type SimdConfig struct {
-	MachineID       string
-	CPUs            int
-	Memory          string
-	CPUArchitecture string
-	Availability    string
-	DispatcherURL   string
-	SimdURL         string
-	MaxSimulations  int // maximum number of simulations this machine can run
+	MachineID          string
+	CPUs               int
+	Memory             string
+	CPUArchitecture    string
+	Availability       string
+	DispatcherURL      string
+	SimdURL            string
+	MaxSimulations     int    // maximum number of simulations this machine can run
+	SimdSimulationsDir string // directory where simulations are stored
+
 }
 
 // SimulatorStatus response from simulator
