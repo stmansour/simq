@@ -28,8 +28,14 @@ type Simulation struct {
 	LastStatus SimulatorStatus
 }
 
-// Start the simulator with given SID and config file
-func startSimulator(sid int64, configFile string) error {
+// Start the simulator with given SID and config file.
+// Inputs:
+//
+//	sid - the simulation ID
+//	FQConfigFileName - the fully qualified name of the config file
+//
+// -----------------------------------------------------------------------------
+func startSimulator(sid int64, FQConfigFileName string) error {
 	fmt.Printf("Starting simulation %d\n", sid)
 	//-------------------------------------------------------------
 	// Start the simulator
@@ -37,9 +43,8 @@ func startSimulator(sid int64, configFile string) error {
 	//-------------------------------------------------------------
 	Directory := filepath.Join(app.cfg.SimdSimulationsDir, "simulations", fmt.Sprintf("%d", sid))
 	logFile := filepath.Join(Directory, "sim.log")
-	cf := filepath.Join(app.cfg.SimdSimulationsDir, configFile)
 	cmd := exec.Command("/usr/local/plato/bin/simulator",
-		"-c", cf,
+		"-c", FQConfigFileName,
 		"-SID", fmt.Sprintf("%d", sid),
 		"-DISPATCHER", app.cfg.DispatcherURL)
 

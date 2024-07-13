@@ -96,7 +96,7 @@ func listDoneJobs(cmd *CmdData, args []string) {
 }
 
 func listCore(command *util.Command) {
-	body := util.SendRequest(defaultURL, command)
+	body := util.SendRequest(app.DispatcherURL, command)
 
 	resp := struct {
 		Status string

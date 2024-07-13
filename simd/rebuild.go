@@ -249,8 +249,8 @@ func recoverBookedSimulation(qi *data.QueueItem) {
 	// just archive them and move on.
 	//---------------------------------------------------------------
 	if recovered, err := sim.recoverBasedOnFiles(); err != nil || recovered {
-		if ! strings.Contains(err.Error(),"no such file or directory" {
-		    return // error occurred and logged
+		if !strings.Contains(err.Error(), "no such file or directory") {
+			return // error occurred and logged
 		}
 		fmt.Printf("simd >>>> booked simulation directory or config file does not exist in %s.\n", sim.Directory)
 	}

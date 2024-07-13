@@ -3,6 +3,7 @@ BINDIR=${TOP}/dist/simq
 THISDIR="simd"
 TEST_FAILURE_FILE=fail
 BUILD_TIME := $(shell date "+%Y-%m-%d_%H:%M:%S")
+MACHINENAME := $(shell hostname)
 
 simd: *.go
 	go vet
@@ -22,6 +23,8 @@ test: config
 config:
 	@if [ ! -f ./config.json5 ]; then cp /usr/local/plato/bin/config.json5 .;echo "copied config.json5";fi
 	@if [ ! -f ./extres.json5 ]; then cp ~/.vault/extres.json5 .;echo "copied extres.json5";fi
+	@if [ "${MACHINENAME}" = "StevesMcBookPro.attlocal.net" ]; then cp simdconfsman.json5 simdconfig.json5; echo "simdconfig set for sman"; fi
+	@if [ "${MACHINENAME}" = "plato" ]; then cp simdconfigplato.json5 simdconfig.json5; echo "simdconfig set for plato"; fi
 
 coverage:
 	go tool cover -html=coverage.out 

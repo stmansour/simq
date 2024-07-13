@@ -1,0 +1,10 @@
+{
+    "CPUs": 10,
+    "Memory": "64GB",
+    "CPUArchitecture": "ARM",
+    "MaxSimulations": 2,
+    "SimdSimulationsDir": "/var/lib/simd",
+    "DispatcherQueueDir": "/var/lib/dispatcher",
+    "SimResultsDir": "/opt/TestSimResultsRepo",
+    "DispatcherURL": "http://192.168.5.100:8250/"
+}

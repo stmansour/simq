@@ -186,7 +186,7 @@ func bookAndRunSimulation(bkcmd string, sid int64) error {
 				configDir := filepath.Join(app.cfg.SimdSimulationsDir, "simulations", fmt.Sprintf("%d", bookResp.SID))
 				fmt.Printf("BOOK CMD:  configDir = %s\n", configDir)
 				os.MkdirAll(configDir, os.ModePerm)
-				configPath := fmt.Sprintf("%s/%s", configDir, bookResp.ConfigFilename)
+				configPath := filepath.Join(configDir, bookResp.ConfigFilename)
 
 				out, err := os.Create(configPath)
 				if err != nil {
@@ -196,6 +196,7 @@ func bookAndRunSimulation(bkcmd string, sid int64) error {
 				if _, err := io.Copy(out, part); err != nil {
 					return fmt.Errorf("failed to write config file: %v", err)
 				}
+				fmt.Printf("BOOK CMD: config file written: %s\n", configPath)
 			}
 		}
 		return startSimulator(bookResp.SID, bookResp.ConfigFilename)
