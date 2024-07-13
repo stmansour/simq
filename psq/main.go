@@ -4,8 +4,10 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"os/user"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -29,10 +31,11 @@ type DCommand struct {
 }
 
 var app struct {
-	action        string
-	file          string
-	sid           int64
-	DispatcherURL string
+	action         string
+	file           string
+	sid            int64
+	DispatcherURL  string
+	DispatcherHost string
 }
 
 // Commands represents the list of commands
@@ -45,6 +48,7 @@ func init() {
 		{Command: "list", ArgCount: 0, Handler: listJobs, Help: "List pending simulations"},
 		{Command: "listdone", ArgCount: 0, Handler: listDoneJobs, Help: "List completed simulations"},
 		{Command: "delete", ArgCount: 1, Handler: deleteJob, Help: "Delete a simulation from the queue"},
+		{Command: "dispatcher", ArgCount: 1, Handler: setDispatcherURL, Help: "Set the URL for the dispatcher"},
 		{Command: "exit", ArgCount: 0, Handler: handleExit, Help: "Exit the program"},
 		{Command: "quit", ArgCount: 0, Handler: handleExit, Help: "Exit the program"},
 		{Command: "help", ArgCount: 0, Handler: handleHelp, Help: "Show this help message"},
@@ -52,24 +56,29 @@ func init() {
 }
 
 func main() {
-	app.DispatcherURL = "http://216.16.195.147:8250/" // default dispatcher URL is on plato server
+	var err error
+	app.DispatcherHost = "http://216.16.195.147:8250/" // default dispatcher URL is on plato server
 
 	action := flag.String("action", "", "Action to perform: add, list, delete")
-	dsp := flag.String("d", "", "URL to dispatcher, default: "+app.DispatcherURL)
+	dsp := flag.String("d", "", "URL to dispatcher, default: "+app.DispatcherHost)
 	file := flag.String("file", "config.json5", "Path to config file (default: config.json5)")
 	sid := flag.Int64("sid", 0, "Simulation ID for delete action")
 
 	if err := util.LoadHomeDirConfig(".psqrc", &app); err != nil {
-		if ! strings.Contains(err.Error(),"no such file or directory") {
-		    fmt.Printf("Error loading config file: %v\n", err)
-		    return
+		if !strings.Contains(err.Error(), "no such file or directory") {
+			fmt.Printf("Error loading config file: %v\n", err)
+			return
 		}
 	}
 
 	flag.Parse()
 	app.action = *action
 	if len(*dsp) > 0 {
-		app.DispatcherURL = *dsp
+		app.DispatcherHost = *dsp
+	}
+	if app.DispatcherURL, err = JoinURL(app.DispatcherHost, "command"); err != nil {
+		fmt.Printf("Error joining dispatcher URL: %v\n", err)
+		return
 	}
 
 	usr, err := user.Current()
@@ -131,7 +140,7 @@ func interactiveMode(cmd *CmdData) {
 	defer rl.Close()
 
 	fmt.Printf("PSQ Version %s\n", util.Version())
-  fmt.Printf("Targeting Dispatcher at: %s\n",app.DispatcherURL)
+	fmt.Printf("Targeting Dispatcher at: %s\n", app.DispatcherHost)
 	fmt.Printf("Type 'help' for a command list, Up Arrow for previous command, and Down Arrow for next command.\n")
 
 	for {
@@ -174,4 +183,30 @@ func handleHelp(cmd *CmdData, args []string) {
 	for _, dcmd := range Commands {
 		fmt.Printf("%s: %s\n", dcmd.Command, dcmd.Help)
 	}
+}
+func setDispatcherURL(cmd *CmdData, args []string) {
+	var err error
+	var url string
+	if len(args) > 0 && len(args[0]) > 0 {
+		if url, err = JoinURL(args[0], "command"); err != nil {
+			fmt.Printf("Error joining dispatcher URL: %v\n", err)
+			return
+		}
+		app.DispatcherHost = args[0]
+		app.DispatcherURL = url
+		fmt.Printf("Dispatcher URL set to: %s\n", app.DispatcherURL)
+	}
+}
+
+// JoinURL joins base URL with endpoint.
+func JoinURL(base string, endpoint string) (string, error) {
+	baseURL, err := url.Parse(base)
+	if err != nil {
+		return "", err
+	}
+
+	// Join paths correctly
+	baseURL.Path = path.Join(baseURL.Path, endpoint)
+
+	return baseURL.String(), nil
 }

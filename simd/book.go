@@ -158,6 +158,7 @@ func bookAndRunSimulation(bkcmd string, sid int64) error {
 		fmt.Println("Response Content-Type:", contentType) // Debugging
 	}
 
+	var FQConfigFileName string
 	if strings.HasPrefix(contentType, "multipart/") {
 		//=========================================================
 		// MULTIPART
@@ -186,9 +187,9 @@ func bookAndRunSimulation(bkcmd string, sid int64) error {
 				configDir := filepath.Join(app.cfg.SimdSimulationsDir, "simulations", fmt.Sprintf("%d", bookResp.SID))
 				fmt.Printf("BOOK CMD:  configDir = %s\n", configDir)
 				os.MkdirAll(configDir, os.ModePerm)
-				configPath := filepath.Join(configDir, bookResp.ConfigFilename)
+				FQConfigFileName = filepath.Join(configDir, bookResp.ConfigFilename)
 
-				out, err := os.Create(configPath)
+				out, err := os.Create(FQConfigFileName)
 				if err != nil {
 					return fmt.Errorf("failed to create config file: %v", err)
 				}
@@ -196,10 +197,10 @@ func bookAndRunSimulation(bkcmd string, sid int64) error {
 				if _, err := io.Copy(out, part); err != nil {
 					return fmt.Errorf("failed to write config file: %v", err)
 				}
-				fmt.Printf("BOOK CMD: config file written: %s\n", configPath)
+				fmt.Printf("BOOK CMD: config file written: %s\n", FQConfigFileName)
 			}
 		}
-		return startSimulator(bookResp.SID, bookResp.ConfigFilename)
+		return startSimulator(bookResp.SID, FQConfigFileName)
 	} else if strings.HasPrefix(contentType, "application/json") {
 		//=========================================================
 		// SINGLE-PART
