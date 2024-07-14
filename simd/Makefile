@@ -33,6 +33,10 @@ package:
 	cp simd ${BINDIR}/
 	@echo "*** ${THISDIR}: completed package ***"
 
+release:
+	mkdir -p /usr/local/simq/simd
+	cp dispatcher /usr/local/simq/simd/
+
 releaseman:
 	if [ -d /usr/local/share/man/man1 ] && [ -w /usr/local/share/man/man1 ]; then cp simd.1 /usr/local/share/man/man1/ ; fi
 	@echo "*** ${THISDIR}: completed releaseman ***"
