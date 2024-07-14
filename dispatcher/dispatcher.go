@@ -413,7 +413,7 @@ func handleBook(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	//-----------------------------------------------------------------------------
 	// FIND THE CONFIG FILE FOR THIS JOB
 	//-----------------------------------------------------------------------------
-	configDir := fmt.Sprintf("%s/%d", app.QdConfigsDir, queueItem.SID)
+	configDir := filepath.Join(app.QdConfigsDir, fmt.Sprintf("%d", queueItem.SID))
 	configFilename, err := findConfigFile(configDir)
 	if err != nil {
 		SvcErrorReturn(w, fmt.Errorf("error finding config file: %s", err.Error()))
@@ -521,7 +521,7 @@ func handleNewSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	//----------------------------------------------
 	// Create the directory if it doesn't exist
 	//----------------------------------------------
-	err = os.MkdirAll("app.QdConfigsDir", os.ModePerm)
+	err = os.MkdirAll(app.QdConfigsDir, os.ModePerm)
 	if err != nil {
 		LogAndErrorReturn(w, fmt.Errorf("failed to create directory: %v", err))
 		return
@@ -530,7 +530,7 @@ func handleNewSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	//----------------------------------------------
 	// Create a new file in the qdconfigs directory
 	//----------------------------------------------
-	tempFile, err := os.CreateTemp("app.QdConfigsDir", "config-*.json5")
+	tempFile, err := os.CreateTemp(app.QdConfigsDir, "config-*.json5")
 	if err != nil {
 		LogAndErrorReturn(w, fmt.Errorf("failed to create directory %s: %v", app.QdConfigsDir, err))
 		return
