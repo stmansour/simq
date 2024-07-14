@@ -2,7 +2,7 @@ TOP=..
 BINDIR=${TOP}/dist/simq
 THISDIR="dispatcher"
 TEST_FAILURE_FILE=fail
-BUILD_TIME := $(shell date "+%Y-%m-%d_%H:%M:%S")
+BUILD_TIME := $(shell date "+%Y-%m-%d %H:%M:%S")
 
 dispatcher: *.go
 	go vet
@@ -18,7 +18,7 @@ clean:
 
 test: config
 	@touch $(TEST_FAILURE_FILE)
-	@go test github.com/stmansour/simq/${THISDIR}
+	@go test -timeout 15s github.com/stmansour/simq/${THISDIR}
 	@./functest.sh && rm -f $(TEST_FAILURE_FILE) 
 	@go test -coverprofile=coverage.out -coverpkg=./
 	@echo "*** ${THISDIR}: completed test ***"

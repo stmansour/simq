@@ -336,7 +336,8 @@ if [[ "${SINGLETEST}${TFILES}" = "${TFILES}" || "${SINGLETEST}${TFILES}" = "${TF
     #---------------------------------------
     # Wait for the dispatcher to shutdown
     #---------------------------------------
-    if ps -p "${DISPATCHER_PID}" > /dev/null; then
+    PID=$(pgrep dispatcher)
+    if [ "${PID}x" != "x" ]; then
         echo "Dispatcher still running after shutdown command" >> ${RESFILE}
     else
         echo "Dispatcher has shut down successfully" >> ${RESFILE}

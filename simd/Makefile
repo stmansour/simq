@@ -2,7 +2,7 @@ TOP=..
 BINDIR=${TOP}/dist/simq
 THISDIR="simd"
 TEST_FAILURE_FILE=fail
-BUILD_TIME := $(shell date "+%Y-%m-%d_%H:%M:%S")
+BUILD_TIME := $(shell date "+%Y-%m-%d %H:%M:%S")
 MACHINENAME := $(shell hostname)
 
 simd: *.go

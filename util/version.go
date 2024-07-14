@@ -8,5 +8,5 @@ var (
 
 // Version returns the version string for this build
 func Version() string {
-	return majorVersion + "." + minorVersion + "-" + buildID
+	return majorVersion + "." + minorVersion + " " + buildID
 }

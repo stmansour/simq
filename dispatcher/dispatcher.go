@@ -139,12 +139,12 @@ func commandDispatcher(w http.ResponseWriter, r *http.Request) {
 	//------------------------------
 	// DEBUG
 	//------------------------------
-	if app.HTTPHdrsDbg {
-		log.Println("Request Headers:")
-		for k, v := range r.Header {
-			log.Printf("%s: %s\n", k, v)
-		}
-	}
+	// if app.HTTPHdrsDbg {
+	// 	log.Println("Request Headers:")
+	// 	for k, v := range r.Header {
+	// 		log.Printf("%s: %s\n", k, v)
+	// 	}
+	// }
 
 	// Check for Content-Type header
 	contentType := r.Header.Get("Content-Type")
@@ -178,9 +178,9 @@ func commandDispatcher(w http.ResponseWriter, r *http.Request) {
 			SvcErrorReturn(w, fmt.Errorf("failed to read request body: %v", err))
 			return
 		}
-		if app.HexASCIIDbg {
-			util.PrintHexAndASCII(bodyBytes, 256)
-		}
+		// if app.HexASCIIDbg {
+		// 	util.LogHexAndASCII(bodyBytes, 256)
+		// }
 		if err := json.Unmarshal(bodyBytes, &cmd); err != nil {
 			SvcErrorReturn(w, fmt.Errorf("invalid request payload: %v", err))
 			return
@@ -196,7 +196,7 @@ func commandDispatcher(w http.ResponseWriter, r *http.Request) {
 	d.cmd = &cmd
 
 	// DEBUGGING...
-	log.Printf("\tcommand: %s, username: %s", cmd.Command, cmd.Username)
+	log.Printf("\tDispatcher: >>>> received command: %s, username: %s", cmd.Command, cmd.Username)
 
 	h, ok = handlerTable[cmd.Command]
 	if !ok {
@@ -494,6 +494,8 @@ func handleBook(w http.ResponseWriter, r *http.Request, d *HInfo) {
 // It creates a new entry in the queue
 // ---------------------------------------------------------------------------
 func handleNewSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
+	log.Printf("dispatcher >>>> NewSimulation handler\n")
+
 	//-----------------------------------------------------------
 	// Unmarshal the command data into CreateQueueEntryRequest
 	//-----------------------------------------------------------
@@ -615,6 +617,7 @@ func handleShutdown(w http.ResponseWriter, r *http.Request, d *HInfo) {
 // handleGetActiveQueue handles the GetActiveQueue command
 // -----------------------------------------------------------------------------
 func handleGetActiveQueue(w http.ResponseWriter, r *http.Request, d *HInfo) {
+	log.Printf("dispatcher >>>> GetActiveQueue handler\n")
 	items, err := app.qm.GetQueuedAndExecutingItems()
 	if err != nil {
 		SvcErrorReturn(w, fmt.Errorf("failed to get active queue items"))
@@ -636,6 +639,7 @@ func handleGetActiveQueue(w http.ResponseWriter, r *http.Request, d *HInfo) {
 // specified machine
 // -----------------------------------------------------------------------------
 func handleGetMachineQueue(w http.ResponseWriter, r *http.Request, d *HInfo) {
+	log.Printf("dispatcher >>>> GetMachineQueue handler\n")
 	//-----------------------------------------------------------
 	// Unmarshal the command data into MachineQueueRequest
 	//-----------------------------------------------------------
@@ -664,6 +668,7 @@ func handleGetMachineQueue(w http.ResponseWriter, r *http.Request, d *HInfo) {
 // handleGetCompletedQueue handles the GetCompletedQueue command
 // -----------------------------------------------------------------------------
 func handleGetCompletedQueue(w http.ResponseWriter, r *http.Request, d *HInfo) {
+	log.Printf("dispatcher >>>> GetCompletedQueue handler\n")
 	items, err := app.qm.GetCompletedItems()
 	if err != nil {
 		SvcErrorReturn(w, fmt.Errorf("failed to get active queue items"))
@@ -684,7 +689,8 @@ func handleGetCompletedQueue(w http.ResponseWriter, r *http.Request, d *HInfo) {
 // handleUpdateItem handles the UpdateItem command
 // -----------------------------------------------------------------------------
 func handleUpdateItem(w http.ResponseWriter, r *http.Request, d *HInfo) {
-	z := string(rune(0x2026)) // the '...' character, we take this to mean "not set"
+	log.Printf("dispatcher >>>> UpdateItem handler\n")
+	z := string(rune(0x2026)) // the '...' character
 
 	//--------------------------------------------------------
 	// The values for req indicate that the field is not set
@@ -778,6 +784,7 @@ func handleUpdateItem(w http.ResponseWriter, r *http.Request, d *HInfo) {
 // handleDeleteItem handles the DeleteItem command
 // -----------------------------------------------------------------------------
 func handleDeleteItem(w http.ResponseWriter, r *http.Request, d *HInfo) {
+	log.Printf("dispatcher >>>> DeleteItem handler\n")
 	var req DeleteItemRequest
 	if err := json.Unmarshal(d.cmd.Data, &req); err != nil {
 		SvcErrorReturn(w, fmt.Errorf("invalid request data"))

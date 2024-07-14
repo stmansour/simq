@@ -2,7 +2,7 @@ TOP=..
 BINDIR=${TOP}/dist/simq
 THISDIR=psq
 TEST_FAILURE_FILE=fail
-BUILD_TIME := $(shell date "+%Y-%m-%d_%H:%M:%S")
+BUILD_TIME := $(shell date "+%Y-%m-%d %H:%M:%S")
 
 dispatcher: *.go
 	go vet

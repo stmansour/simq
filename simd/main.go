@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"net/url"
 	"os"
@@ -54,10 +55,12 @@ var app struct {
 	sims        []Simulation // currently running simulations
 	HexASCIIDbg bool         // if true print reply buffers in hex and ASCII
 	HTTPHdrsDbg bool         // if true print HTTP headers
+	version     bool
 }
 
 func readCommandLineArgs() {
 	flag.BoolVar(&app.HexASCIIDbg, "D", false, "Turn on debug mode")
+	flag.BoolVar(&app.version, "v", false, "Print the program version string")
 	flag.Parse()
 }
 
@@ -92,6 +95,10 @@ func main() {
 	//-------------------------------------
 	readCommandLineArgs()
 	app.HTTPHdrsDbg = app.HexASCIIDbg
+	if app.version {
+		fmt.Println("simd version:", util.Version())
+		os.Exit(0)
+	}
 
 	//-------------------------------------
 	// GET MY IP ADDRESS
@@ -107,7 +114,8 @@ func main() {
 		app.cfg.SimdURL = naddrs[i].IPAddress
 	}
 	log.Printf("\n-----------------------------------------------------------------\n")
-	log.Printf("SimdIP Address: %s\n", app.cfg.SimdURL)
+	log.Printf("simd version: %s\n", util.Version())
+	log.Printf("simd network address: %s\n", app.cfg.SimdURL)
 
 	//-------------------------------------
 	// SETUP THE DISPATCHER URL

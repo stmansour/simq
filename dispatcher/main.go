@@ -50,6 +50,10 @@ func setMyNetworkAddress() {
 }
 
 func doMain() {
+	if app.version {
+		fmt.Println("dispatcher version:", util.Version())
+		return
+	}
 	//-----------------------------------------
 	// OUTPUT MESSAGES TO A LOGFILE
 	//-----------------------------------------
@@ -57,7 +61,6 @@ func doMain() {
 	if err != nil {
 		log.Fatalf("Failed to get executable directory: %v", err)
 	}
-
 	fname := filepath.Join(exdir, "dispatcher.log")
 	logFile, err := os.OpenFile(fname, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
@@ -66,6 +69,9 @@ func doMain() {
 	defer logFile.Close()
 	log.SetOutput(logFile)
 
+	//-----------------------------------------
+	// READ IN CONFIGURATION
+	//-----------------------------------------
 	ex, err := util.ReadExternalResources()
 	if err != nil {
 		log.Fatalf("Failed to read external resources: %v", err)
@@ -73,21 +79,28 @@ func doMain() {
 	if ex, err = util.LoadConfig(ex, "dispatcher.json5"); err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
-
 	cmd := ex.GetSQLOpenString(ex.DbName)
 	setMyNetworkAddress()
-
 	log.Printf("---------------------------------------------------------------------\n")
 	log.Printf("Dispatcher Network Address: %s\n", app.DispatcherURL)
 
+	//-----------------------------------------
+	//  OPEN DATABASE FOR THE QUEUE
+	//-----------------------------------------
 	app.qm, err = data.NewQueueManager(cmd)
 	if err != nil {
 		log.Fatalf("Failed to initialize queue manager: %v", err)
 	}
 
+	//-----------------------------------------
+	// INFLOW AND OUTFLOW DIRECTORIES
+	//-----------------------------------------
 	app.SimResultsDir = ex.SimResultsDir
 	app.QdConfigsDir = ex.DispatcherQueueDir
 
+	//-----------------------------------------
+	// SET UP HTTP LISTENER
+	//-----------------------------------------
 	srvAddr := fmt.Sprintf(":%d", app.port)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/command", commandDispatcher)
@@ -96,25 +109,23 @@ func doMain() {
 		Handler: mux,
 	}
 
-	if app.version {
-		log.Println(util.Version())
-	} else {
-		app.shutdownwait = 5
+	//-----------------------------------------
+	// START THE HTTP LISTENER
+	//-----------------------------------------
+	app.shutdownwait = 5
+	go func() {
+		if err := app.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("ListenAndServe(): %v", err)
+		}
+	}()
 
-		go func() {
-			if err := app.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				log.Fatalf("ListenAndServe(): %v", err)
-			}
-		}()
-
-		//---------------------------------
-		// Graceful shutdown handling
-		//---------------------------------
-		app.quit = make(chan os.Signal, 1)
-		signal.Notify(app.quit, os.Interrupt)
-		<-app.quit
-		log.Println("Shutting down server...")
-	}
+	//---------------------------------
+	// Graceful shutdown handling
+	//---------------------------------
+	app.quit = make(chan os.Signal, 1)
+	signal.Notify(app.quit, os.Interrupt)
+	<-app.quit
+	log.Println("Shutting down server...")
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(app.shutdownwait)*time.Second)
 	defer cancel()
 
@@ -123,7 +134,6 @@ func doMain() {
 	}
 
 	log.Println("Server exiting")
-
 }
 
 func main() {
