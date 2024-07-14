@@ -47,7 +47,6 @@ func setMyNetworkAddress() {
 		}
 		app.DispatcherURL = fmt.Sprintf("http://%s:%d/", naddrs[i].IPAddress, app.port)
 	}
-	log.Printf("Dispatcher Network Address: %s\n", app.DispatcherURL)
 }
 
 func doMain() {
@@ -77,6 +76,9 @@ func doMain() {
 
 	cmd := ex.GetSQLOpenString(ex.DbName)
 	setMyNetworkAddress()
+
+	log.Printf("---------------------------------------------------------------------\n")
+	log.Printf("Dispatcher Network Address: %s\n", app.DispatcherURL)
 
 	app.qm, err = data.NewQueueManager(cmd)
 	if err != nil {
