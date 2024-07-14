@@ -6,5 +6,5 @@
     "SimdSimulationsDir": "/var/lib/simd",
     "DispatcherQueueDir": "/var/lib/dispatcher",
     "SimResultsDir": "/genome/simres",
-    "DispatcherURL": "http://192.168.5.100:8250/"
+    "DispatcherURL": "http://216.16.195.147:8250/"
 }
