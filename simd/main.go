@@ -130,6 +130,14 @@ func main() {
 	log.Printf("FQDispatcherURL: %s\n", app.cfg.FQDispatcherURL)
 
 	//-----------------------------------------------------
+	// ENSURE THAT THE SIMULATIONS DIRECTORY EXISTS
+	//-----------------------------------------------------
+	dirPath := filepath.Join(app.cfg.SimdSimulationsDir, "simulations")
+	if err = os.MkdirAll(dirPath, os.ModePerm); err != nil {
+		log.Fatalf("Failed to create %s directory: %v", dirPath, err)
+	}
+
+	//-----------------------------------------------------
 	// SEE IF WE NEED TO RESTORE ANY INTERRUPTED JOBS...
 	//-----------------------------------------------------
 	err = RebuildSimulatorList()

@@ -164,6 +164,7 @@ func recoverExecutingSimulation(qi *data.QueueItem) {
 	sim := buildSimFromQueueItem(qi)
 	if sim.FindRunningSimulator() {
 		log.Printf("simd >>>> recovered running simulator for sid = %d\n", sim.SID)
+		go monitorSimulator(&sim)
 		return
 	}
 
@@ -293,6 +294,7 @@ func recoverBookedSimulation(qi *data.QueueItem) {
 	// it is running, we just need to monitor it.
 	//-----------------------------------------------------------------------
 	if sim.FindRunningSimulator() {
+		go monitorSimulator(&sim)
 		return // found the simulator!!
 	}
 
@@ -342,6 +344,7 @@ func logNotListening(notlistening []int) {
 
 // FindRunningSimulator - Search for a running simulator that belongs to this simulation
 // If it finds the simulator running it will return true. Otherwise it returns false
+// If it returns true, then sim.URL will be set
 // --------------------------------------------------------------------------------
 func (sim *Simulation) FindRunningSimulator() bool {
 	//---------------------------------------------
@@ -369,7 +372,6 @@ func (sim *Simulation) FindRunningSimulator() bool {
 			//----------------------------------------------------
 			log.Printf("simd:  >>>>    **** RECOVERED ****   Connected with running simulatorfor SID = %d on port %d\n", sim.SID, port)
 			sim.URL = url
-			go monitorSimulator(sim)
 			return true
 		}
 	}

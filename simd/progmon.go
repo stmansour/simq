@@ -2,7 +2,6 @@ package main
 
 import (
 	"archive/tar"
-	"bufio"
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
@@ -12,7 +11,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 )
@@ -113,35 +111,38 @@ func startSimulator(sid int64, FQConfigFileName string) error {
 
 // Monitor the simulator process
 func monitorSimulator(sim *Simulation) {
-	log.Printf("simd >>>>  %d\n", sim.SID)
-	//-------------------------------------------------------------
-	// First thing to do is get the first line of its log file.
-	// But let's wait 3 seconds to give it time to startup
-	//-------------------------------------------------------------
-	time.Sleep(3 * time.Second)
-	firstLine, err := getFirstLineOfLog(sim.Directory)
-	if err != nil {
-		log.Printf("Failed to get first line of log file: %v", err)
-		return
-	}
-	//-------------------------------------------------------------------------------
-	// the first line looks like this: "Simtalk address: http://192.168.1.180:8090"
-	// We need to extract the URL from that string
-	//-------------------------------------------------------------------------------
-	startIndex := strings.Index(firstLine, "http://")
-	if startIndex == -1 {
-		log.Println("No HTTP address found")
-		return
-	}
-	sim.URL = firstLine[startIndex:]
+	log.Printf("simd >>>> monitorSimulator: monitoring simulator for SID %d @ %s\n", sim.SID, sim.URL)
 
-	log.Printf("simd >>>> Simulator @ %s\n", sim.URL)
+	//-----------------------------------------------------------------
+	// In some cases, the simulator may already be running. But
+	// the first time it is booked, the simulator will need to
+	// be started. So, give it a few seconds to start. If it's already
+	// running then 3 seconds from now is not going to hurt anything.
+	//-----------------------------------------------------------------
+	time.Sleep(3 * time.Second)
+	maxRetries := 5
+	if len(sim.URL) == 0 {
+		for retryCount := 0; retryCount < maxRetries; retryCount++ {
+			if !sim.FindRunningSimulator() {
+				time.Sleep(60 * time.Second) // we'll wait for 1 minute, up to 5 times
+				continue                     // try again
+			}
+			break
+		}
+		if len(sim.URL) == 0 {
+			log.Printf("monitorSimulator: failed to find running simulator for SID %d\n", sim.SID)
+			return
+		}
+		log.Printf("monitorSimulator: found running simulator for SID %d @ %s\n", sim.SID, sim.URL)
+	} else {
+		log.Printf("simd >>>> Simulator @ %s\n", sim.URL)
+	}
 
 	//-------------------------------------------------------------
 	// Create a ticker that triggers every 5 minutes
 	//-------------------------------------------------------------
 	//ticker := time.NewTicker(5 * time.Minute)
-	ticker := time.NewTicker(1 * time.Minute) // delete this after debugging
+	ticker := time.NewTicker(1 * time.Minute) // set this to 5 minutes after debugging
 	defer ticker.Stop()
 
 	log.Printf("simd >>>> ticker loop >>>> timer set for 1 minute intervals\n")
@@ -161,7 +162,7 @@ func monitorSimulator(sim *Simulation) {
 	// all is well, then transmit files to the dispatcher
 	//-------------------------------------------------------------
 	log.Printf("Simulator @ %s is no longer running.\n", sim.URL)
-	if err = sim.archiveSimulationResults(); err != nil {
+	if err := sim.archiveSimulationResults(); err != nil {
 		log.Printf("Failed to archive simulation results: %v", err)
 		return
 	}
@@ -170,32 +171,32 @@ func monitorSimulator(sim *Simulation) {
 	//-----------------------------------------
 	// Send the results to the dispatcher
 	//-----------------------------------------
-	if err = sim.sendEndSimulationRequest(); err != nil {
+	if err := sim.sendEndSimulationRequest(); err != nil {
 		log.Printf("Failed to send end simulation request: %v", err)
 		return
 	}
 }
 
-func getFirstLineOfLog(Directory string) (string, error) {
-	filePath := filepath.Join(Directory, "sim.log")
+// func getFirstLineOfLog(Directory string) (string, error) {
+// 	filePath := filepath.Join(Directory, "sim.log")
 
-	file, err := os.Open(filePath)
-	if err != nil {
-		return "", fmt.Errorf("failed to open log file: %w", err)
-	}
-	defer file.Close()
+// 	file, err := os.Open(filePath)
+// 	if err != nil {
+// 		return "", fmt.Errorf("failed to open log file: %w", err)
+// 	}
+// 	defer file.Close()
 
-	scanner := bufio.NewScanner(file)
-	if scanner.Scan() {
-		return scanner.Text(), nil
-	}
+// 	scanner := bufio.NewScanner(file)
+// 	if scanner.Scan() {
+// 		return scanner.Text(), nil
+// 	}
 
-	if err := scanner.Err(); err != nil {
-		return "", fmt.Errorf("error reading log file: %w", err)
-	}
+// 	if err := scanner.Err(); err != nil {
+// 		return "", fmt.Errorf("error reading log file: %w", err)
+// 	}
 
-	return "", fmt.Errorf("log file is empty")
-}
+// 	return "", fmt.Errorf("log file is empty")
+// }
 
 // Check if the simulator process is still running
 func (sim *Simulation) isSimulatorRunning() bool {
