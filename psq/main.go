@@ -110,6 +110,7 @@ func main() {
 			line += " " + strconv.Itoa(int(*sid))
 		}
 		handleCmd(line, cmd)
+		return
 	}
 
 	// Start interactive mode
