@@ -23,8 +23,9 @@ test: config
 config:
 	@if [ ! -f ./config.json5 ]; then cp /usr/local/plato/bin/config.json5 .;echo "copied config.json5";fi
 	@if [ ! -f ./extres.json5 ]; then cp ~/.vault/extres.json5 .;echo "copied extres.json5";fi
-	@if [ "${MACHINENAME}" = "StevesMcBookPro.attlocal.net" ]; then cp simdconfsman.json5 simdconf.json5; echo "simdconfig set for sman"; fi
-	@if [ "${MACHINENAME}" = "plato" ]; then cp simdconfplato.json5 simdconfig.json5; echo "simdconfig set for plato"; fi
+	@if [ "${MACHINENAME}" = "StevesMcBookPro.attlocal.net" ]; then cp simdconfsman.json5 simdconf.json5; echo "simdconfig set for ${MACHINENAME}"; fi
+	@if [ "${MACHINENAME}" = "plato" ]; then cp simdconfplato.json5 simdconfig.json5; echo "simdconfig set for ${MACHINENAME}"; fi
+	@if [ "${MACHINENAME}" = "Steves-2020-Pro.attlocal.net" ]; then cp simdsmanx86.json5 simdconfig.json5; echo "simdconfig set for ${MACHINENAME}"; fi
 
 coverage:
 	go tool cover -html=coverage.out 
