@@ -371,7 +371,9 @@ func (sim *Simulation) FindRunningSimulator() bool {
 			// and continue to monitor it as usual
 			//----------------------------------------------------
 			log.Printf("simd:  >>>>    **** CONNECTED ****   Connected with running simulatorfor SID = %d on port %d\n", sim.SID, port)
-			sim.URL = url
+			sim.SimPort = port
+			sim.BaseURL = fmt.Sprintf("http://127.0.0.1:%d", port)
+			sim.FQSimStatusURL = url
 			return true
 		}
 	}
