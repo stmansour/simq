@@ -11,7 +11,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"syscall"
 	"time"
 )
 
@@ -41,7 +40,7 @@ func startSimulator(sid int64, FQConfigFileName string) error {
 	//-------------------------------------------------------------
 	Directory := filepath.Join(app.cfg.SimdSimulationsDir, "simulations", fmt.Sprintf("%d", sid))
 	logFile := filepath.Join(Directory, "sim.log")
-	cmd := exec.Command("/usr/local/plato/bin/simulator",
+	cmd := exec.Command("/usr/local/plato/bin/doit.sh",
 		"-c", FQConfigFileName,
 		"-SID", fmt.Sprintf("%d", sid),
 		"-DISPATCHER", app.cfg.DispatcherURL) // note: we pass the base url to simulator, not the fully qualified url
@@ -65,10 +64,10 @@ func startSimulator(sid int64, FQConfigFileName string) error {
 	// Detach the process. We don't want it to stop
 	// if this process exits or dies
 	//----------------------------------------------
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid: true,
-		Pgid:    0,
-	}
+	//cmd.SysProcAttr = &syscall.SysProcAttr{
+	//	Setpgid: true,
+	//	Pgid:    0,
+	//}
 
 	//----------------------------------------------
 	// Start the process
@@ -84,12 +83,16 @@ func startSimulator(sid int64, FQConfigFileName string) error {
 	// Detach the process. We don't want it to stop
 	// if this process exits or dies
 	//----------------------------------------------
-	if err := cmd.Process.Release(); err != nil {
-		return fmt.Errorf("failed to detach simulator process: %v", err)
-	}
+	//if err := cmd.Process.Release(); err != nil {
+	//	return fmt.Errorf("failed to detach simulator process: %v", err)
+	//}
+
+    //----------------------------------------------------
+    // Creating process no longer needs this file handle
+    //----------------------------------------------------
 	outputFile.Close()
 
-	log.Printf("startSimulator: simulator process released\n")
+	//log.Printf("startSimulator: simulator process released\n")
 
 	//---------------------------------------------------------------
 	// we have a new simulation in process. Add it to the list...
@@ -201,12 +204,14 @@ func monitorSimulator(sim *Simulation) {
 // Check if the simulator process is still running
 func (sim *Simulation) isSimulatorRunning() bool {
 	url := fmt.Sprintf("%s/status", sim.URL)
+	log.Printf("isSimulatorRunning: checking %s, baseURL = %s\n", url, sim.URL)
 	resp, err := http.Get(url)
 	if err != nil {
 		log.Printf("failed to get simulator status: %v", err)
 		return false
 	}
 	defer resp.Body.Close()
+	log.Printf("isSimulatorRunning: received response from %s\n", url)
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -222,6 +227,7 @@ func (sim *Simulation) isSimulatorRunning() bool {
 		log.Printf("error unmarshaling response body: %v", err)
 		return false
 	}
+	log.Printf("isSimulatorRunning: status struct unmarshaled successfully\n")
 	return true
 }
 

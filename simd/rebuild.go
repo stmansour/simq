@@ -370,7 +370,7 @@ func (sim *Simulation) FindRunningSimulator() bool {
 			// The simulator is still running.  Save the URL
 			// and continue to monitor it as usual
 			//----------------------------------------------------
-			log.Printf("simd:  >>>>    **** RECOVERED ****   Connected with running simulatorfor SID = %d on port %d\n", sim.SID, port)
+			log.Printf("simd:  >>>>    **** CONNECTED ****   Connected with running simulatorfor SID = %d on port %d\n", sim.SID, port)
 			sim.URL = url
 			return true
 		}

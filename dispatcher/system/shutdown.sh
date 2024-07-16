@@ -41,7 +41,7 @@ send_command() {
     local RESPONSE
     echo "Sending ${DESCRIPTION} command: curl -s -X POST http://localhost:8250/command -d '${CMD}' -H 'Content-Type: application/json'"
     RESPONSE=$(curl -s -X POST http://localhost:8250/command -d "${CMD}" -H "Content-Type: application/json")
-    echo "Response: ${RESPONSE}" >> serverresponse
+ #   echo "Response: ${RESPONSE}" >> serverresponse
     if is_json "${RESPONSE}"; then
         echo "${RESPONSE}" | jq .
     else
@@ -49,40 +49,76 @@ send_command() {
     fi
 }
 
-#----------------------------------
-# Shutdown the dispatcher
-#----------------------------------
-SHUTDOWN_CMD='{ "command": "Shutdown", "username": "test-user" }'
-send_command "${SHUTDOWN_CMD}" "Shutdown"
-sleep 2
+shutdownDispatcher() {
+    #----------------------------------
+    # Shutdown the dispatcher
+    #----------------------------------
+    SHUTDOWN_CMD='{ "command": "Shutdown", "username": "test-user" }'
+    send_command "${SHUTDOWN_CMD}" "Shutdown"
+    sleep 1
 
-#---------------------------------------
-# Wait for the dispatcher to shutdown
-#---------------------------------------
-PID=$(pgrep dispatcher)
-if [ "${PID}x" != "x" ]; then
-    echo "Dispatcher still running after shutdown command" 
+    #---------------------------------------
+    # Wait for the dispatcher to shutdown
+    #---------------------------------------
+    PID=$(pgrep dispatcher)
+    if [ "${PID}x" != "x" ]; then
+        echo "Dispatcher still running after shutdown command" 
+    else
+        echo "Dispatcher has shut down successfully"
+    fi
+}
+
+
+# Check the exit status of pgrep
+pgrep dispatcher 2>&1 >/dev/null  # Redirect both standard output and error to /dev/null
+if [[ $? -eq 0 ]]; then
+    shutdownDispatcher
 else
-    echo "Dispatcher has shut down successfully"
+    # Check for empty standard error (might indicate process not found)
+    if [[ -z "$(pgrep dispatcher 2>&1)" ]]; then
+        echo "dispatcher was not running"
+    else
+        echo "Error: pgrep failed (check standard error for details)" >&2
+        # Optional: Log captured standard error for further investigation
+        # pgrep_error=$(pgrep dispatcher 2>&1)
+        # echo "Standard Error: $pgrep_error" >&2
+    fi
 fi
 
 #---------------------------------------
 # KILL ALL SIMDs
 #---------------------------------------
 echo "Shutdown simd"
-killall simd
+killall simd >/dev/null 2>&1
 
 #---------------------------------------
 # KILL ALL SIMULATORS
 #---------------------------------------
 echo "Killing all simulators"
-killall simulator
+killall simulator >/dev/null 2>&1
 
 #---------------------------------------
 # RESET SQL DB
 #---------------------------------------
 echo "resetting production simq.Queue table"
-echo "DELETE From simq.Queue WHERE SID>=1;" | mysql simq
+mysql simq <<EOF
+DROP TABLE IF EXISTS Queue;
+CREATE TABLE IF NOT EXISTS Queue (
+     SID BIGINT AUTO_INCREMENT PRIMARY KEY,
+     File VARCHAR(80) NOT NULL,
+     Username VARCHAR(40) NOT NULL,
+     Name VARCHAR(80) NOT NULL DEFAULT '',
+     Priority INT NOT NULL DEFAULT 5,
+     Description VARCHAR(256) NOT NULL DEFAULT '',
+     MachineID VARCHAR(80) NOT NULL DEFAULT '',
+     URL VARCHAR(80) NOT NULL DEFAULT '',
+     State INT NOT NULL DEFAULT 0,
+     DtEstimate DATETIME,
+     DtCompleted DATETIME,
+     Created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     Modified TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+EOF
 
 #---------------------------------------
 # RESET GENOME    (SIMULATION REPOSITORY)
@@ -95,11 +131,11 @@ rm -rf /genome/simres/2024/7/*
 #---------------------------------------
 echo "emptying logs and temp storage for dispatcher"
 rm -rf /var/lib/dispatcher/qdconfigs
-rm /usr/local/simq/dispatcher/dispatcher.log
+rm -f /usr/local/simq/dispatcher/dispatcher.log
 
 #---------------------------------------
 # REMOVE SIMD LOGS & TEMP STORAGE
 #---------------------------------------
 echo "emptying logs and temp storage for simd"
 rm -rf /var/lib/simd/simulations
-rm /usr/local/simq/simd/simd.log
+rm -f /usr/local/simq/simd/simd.log

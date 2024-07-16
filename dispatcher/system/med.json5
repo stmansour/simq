@@ -3,7 +3,7 @@
     "DtStart": "2018-01-01",
     "DtStop": "2018-12-31",
     "EnforceStopDate": true,
-    "LoopCount": 20,
+    "LoopCount": 60,
     "Generations": 10,
     // "GenDurSpec": "1 Y",
     "PopulationSize": 200,

@@ -36,6 +36,7 @@ var app struct {
 	sid            int64
 	DispatcherURL  string
 	DispatcherHost string
+    cwd            string
 }
 
 // Commands represents the list of commands
@@ -58,6 +59,12 @@ func init() {
 func main() {
 	var err error
 	app.DispatcherHost = "http://216.16.195.147:8250/" // default dispatcher URL is on plato server
+    app.cwd, err = os.Getwd()
+    if err != nil {
+        fmt.Println(err)
+    } else {
+        fmt.Println("Current working directory:", app.cwd)
+    }
 
 	action := flag.String("action", "", "Action to perform: add, list, delete")
 	dsp := flag.String("d", "", "URL to dispatcher, default: "+app.DispatcherHost)
