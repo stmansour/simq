@@ -42,7 +42,7 @@ func startSimulator(sid int64, FQConfigFileName string) error {
 	//-------------------------------------------------------------
 	Directory := filepath.Join(app.cfg.SimdSimulationsDir, "simulations", fmt.Sprintf("%d", sid))
 	logFile := filepath.Join(Directory, "sim.log")
-	cmd := exec.Command("/usr/local/plato/bin/doit.sh",
+	cmd := exec.Command("/usr/local/plato/bin/simwrapper",
 		"-c", FQConfigFileName,
 		"-SID", fmt.Sprintf("%d", sid),
 		"-DISPATCHER", app.cfg.DispatcherURL) // note: we pass the base url to simulator, not the fully qualified url
@@ -184,14 +184,12 @@ func monitorSimulator(sim *Simulation) {
 
 // Check if the simulator process is still running
 func (sim *Simulation) isSimulatorRunning() bool {
-	log.Printf("isSimulatorRunning: checking %s\n", sim.FQSimStatusURL)
 	resp, err := http.Get(sim.FQSimStatusURL)
 	if err != nil {
 		log.Printf("failed to get simulator status: %v", err)
 		return false
 	}
 	defer resp.Body.Close()
-	log.Printf("isSimulatorRunning: received response from %s\n", sim.FQSimStatusURL)
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -207,7 +205,6 @@ func (sim *Simulation) isSimulatorRunning() bool {
 		log.Printf("error unmarshaling response body: %v", err)
 		return false
 	}
-	log.Printf("isSimulatorRunning: status struct unmarshaled successfully\n")
 	return true
 }
 
