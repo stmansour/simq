@@ -6,7 +6,7 @@
     "LoopCount": 20,
     "Generations": 100,
     // "GenDurSpec": "1 Y",
-    "PopulationSize": 2000,
+    "PopulationSize": 500,
     "C1": "USD",
     "C2": "JPY",
     "InitFunds": 100000.00,
