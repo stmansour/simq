@@ -136,68 +136,57 @@ func commandDispatcher(w http.ResponseWriter, r *http.Request) {
 	app.HTTPHdrsDbg = true
 	app.HexASCIIDbg = true
 
-	//------------------------------
-	// DEBUG
-	//------------------------------
-	// if app.HTTPHdrsDbg {
-	// 	log.Println("Request Headers:")
-	// 	for k, v := range r.Header {
-	// 		log.Printf("%s: %s\n", k, v)
-	// 	}
-	// }
-
+	//--------------------------------
 	// Check for Content-Type header
+	//-------------------------------
 	contentType := r.Header.Get("Content-Type")
 	if contentType == "" {
-		SvcErrorReturn(w, fmt.Errorf("missing Content-Type header in request"))
+		SvcErrorReturn(w, fmt.Errorf("commandDispatcher: missing Content-Type header in request"))
 		return
 	}
 
-	// Multipart request
+	//--------------------------------------------
+	// Process the request based on Content-Type
+	//--------------------------------------------
 	if strings.Contains(contentType, "multipart/form-data") {
 		if err := r.ParseMultipartForm(10 << 20); err != nil {
-			SvcErrorReturn(w, fmt.Errorf("failed to parse multipart form: %v", err))
+			SvcErrorReturn(w, fmt.Errorf("commandDispatcher: failed to parse multipart form: %v", err))
 			return
 		}
-
-		// Extract the data part
-		dataField := r.FormValue("data")
+		dataField := r.FormValue("data") // Extract the data part
 		if dataField == "" {
-			SvcErrorReturn(w, fmt.Errorf("missing data field in multipart request"))
+			SvcErrorReturn(w, fmt.Errorf("commandDispatcher: missing data field in multipart request"))
 			return
 		}
 		d.BodyBytes = []byte(dataField)
 		if err := json.Unmarshal([]byte(dataField), &cmd); err != nil {
-			SvcErrorReturn(w, fmt.Errorf("invalid data payload in multipart request: %v", err))
+			SvcErrorReturn(w, fmt.Errorf("commandDispatcher: invalid data payload in multipart request: %v", err))
 			return
 		}
 	} else {
-		// Single-part request - unmarshal directly
-		bodyBytes, err := io.ReadAll(r.Body)
+		bodyBytes, err := io.ReadAll(r.Body) // Single-part request - unmarshal directly
 		if err != nil {
-			SvcErrorReturn(w, fmt.Errorf("failed to read request body: %v", err))
+			SvcErrorReturn(w, fmt.Errorf("commandDispatcher: failed to read request body: %v", err))
 			return
 		}
-		// if app.HexASCIIDbg {
-		// 	util.LogHexAndASCII(bodyBytes, 256)
-		// }
 		if err := json.Unmarshal(bodyBytes, &cmd); err != nil {
-			SvcErrorReturn(w, fmt.Errorf("invalid request payload: %v", err))
+			SvcErrorReturn(w, fmt.Errorf("commandDispatcher: invalid request payload: %v", err))
 			return
 		}
 
-		// Store the raw body bytes
-		d.BodyBytes = bodyBytes
+		d.BodyBytes = bodyBytes // Store the raw body bytes for use by the handlers
 	}
 
-	//---------------------------------------------------------------------------
-	// Define d with the unmarshalled cmd struct and BodyBytes (if applicable)
-	//---------------------------------------------------------------------------
-	d.cmd = &cmd
+	d.cmd = &cmd // Define d with the unmarshalled cmd struct and BodyBytes (if applicable)
 
-	// DEBUGGING...
+	//--------------------
+	// DEBUGGING
+	//--------------------
 	log.Printf("\tDispatcher: >>>> received command: %s, username: %s", cmd.Command, cmd.Username)
 
+	//---------------------------------------------------------------
+	// Access the handler table without mutex since it's read-only
+	//---------------------------------------------------------------
 	h, ok = handlerTable[cmd.Command]
 	if !ok {
 		log.Printf("Internal Error: handler not found for command: %s", cmd.Command)
@@ -218,11 +207,11 @@ func commandDispatcher(w http.ResponseWriter, r *http.Request) {
 //	        Filename - the name of the tar.gz file
 //
 // ---------------------------------------------------------------------------
-func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) { // Include d *HInfo
+func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	var cmd EndSimulationRequest
 
 	if err := json.Unmarshal(d.BodyBytes, &cmd); err != nil {
-        SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: invalid end simulation request data"))
+		SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: invalid end simulation request data"))
 		return
 	}
 
@@ -250,7 +239,7 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) { // 
 	// CREATE THE FULL PATH
 	//--------------------------------------------------
 	if err := os.MkdirAll(dirPath, os.ModePerm); err != nil {
-        SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to create directory: %v", err))
+		SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to create directory: %v", err))
 		return
 	}
 
@@ -259,13 +248,13 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) { // 
 	//----------------------------------------------------
 	file, _, err := r.FormFile("file")
 	if err != nil {
-        SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to get file from form"))
+		SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to get file from form"))
 		return
 	}
 	defer file.Close()
 	fileContent, err := io.ReadAll(file)
 	if err != nil {
-        SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to read file content"))
+		SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to read file content"))
 		return
 	}
 
@@ -274,12 +263,12 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) { // 
 	//----------------------------------------------
 	tarz, err := os.Create(filename)
 	if err != nil {
-        LogAndErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to create file %s: %v", filename, err))
+		LogAndErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to create file %s: %v", filename, err))
 		return
 	}
 	defer tarz.Close()
 	if len(fileContent) == 0 {
-        LogAndErrorReturn(w, fmt.Errorf("handleEndSimulation: no file content. 0-length file"))
+		LogAndErrorReturn(w, fmt.Errorf("handleEndSimulation: no file content. 0-length file"))
 		return
 	}
 
@@ -287,7 +276,7 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) { // 
 	// WRITE THE TAR.GZ FILE
 	//----------------------------------------------
 	if _, err := tarz.Write(fileContent); err != nil {
-        LogAndErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to write file content: %v", err))
+		LogAndErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to write to file %s: %v", filename, err))
 		return
 	}
 
@@ -296,11 +285,13 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) { // 
 	//----------------------------------------------
 	originalDir, err := os.Getwd() // Save the current directory
 	if err != nil {
-	    LogAndErrorReturn(w, fmt.Errorf("failed to get current directory: %v", err))
+		LogAndErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to get current directory: %v", err))
+		return
 	}
 	err = os.Chdir(dirPath) // Change to the target directory
 	if err != nil {
-	    LogAndErrorReturn(w, fmt.Errorf("failed to change directory to %s: %v", dirPath, err))
+		LogAndErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to change directory to %s: %v", dirPath, err))
+		return
 	}
 
 	//----------------------------------------------------------------------
@@ -317,21 +308,20 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) { // 
 		time.Sleep(retryDelay)
 	}
 	if err != nil {
-        LogAndErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to execute tar command after %d attempts: %v", maxRetries, err))
-        return
+		LogAndErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to execute tar command after %d attempts: %v", maxRetries, err))
+		return
 	}
-
 
 	err = os.Chdir(originalDir) // Return back to the original directory
 	if err != nil {
-        LogAndErrorReturn(w,fmt.Errorf("handleEndSimulation: failed to change back to the original directory: %v", err))
+		LogAndErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to change back to the original directory: %v", err))
 	}
 
 	//----------------------------
 	// REMOVE THE TAR.GZ FILE
 	//----------------------------
 	if err := os.Remove(filename); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("failed to remove config file"))
+		LogAndErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to remove config file"))
 		return
 	}
 
@@ -341,9 +331,9 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) { // 
 	queueItem, err := app.qm.GetItemByID(cmd.SID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			SvcErrorReturn(w, fmt.Errorf("queue item %d not found", cmd.SID))
+			LogAndErrorReturn(w, fmt.Errorf("handleEndSimulation: queue item %d not found", cmd.SID))
 		} else {
-			SvcErrorReturn(w, fmt.Errorf("error in GetItemByID: %v", err))
+			LogAndErrorReturn(w, fmt.Errorf("handleEndSimulation: error in GetItemByID: %v", err))
 		}
 		return
 	}
@@ -351,7 +341,7 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) { // 
 	queueItem.State = data.StateResultsSaved
 
 	if err := app.qm.UpdateItem(queueItem); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("error in UpdateItem: %v", err))
+		LogAndErrorReturn(w, fmt.Errorf("handleEndSimulation: error in UpdateItem: %v", err))
 		return
 	}
 
@@ -390,7 +380,7 @@ func handleBook(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	case "Book":
 		log.Printf("handling Book command\n")
 		if err := json.Unmarshal(d.cmd.Data, &bookingRequest); err != nil {
-			SvcErrorReturn(w, fmt.Errorf("invalid booking request data"))
+			SvcErrorReturn(w, fmt.Errorf("handleBook: invalid booking request data"))
 			return
 		}
 		//---------------------------------------------------
@@ -408,25 +398,25 @@ func handleBook(w http.ResponseWriter, r *http.Request, d *HInfo) {
 				SvcWriteResponse(w, &msg)
 				return
 			}
-			SvcErrorReturn(w, fmt.Errorf("err: %s", err.Error()))
+			SvcErrorReturn(w, fmt.Errorf("handleBook: err: %s", err.Error()))
 			return
 		}
 	case "Rebook":
 		log.Printf("handling Rebook command\n")
 		if err := json.Unmarshal(d.cmd.Data, &rebookRequest); err != nil {
-			SvcErrorReturn(w, fmt.Errorf("invalid rebook request data"))
+			SvcErrorReturn(w, fmt.Errorf("handleBook: invalid rebook request data"))
 			return
 		}
 		queueItem, err = app.qm.GetItemByID(rebookRequest.SID)
 		if err != nil {
-			SvcErrorReturn(w, fmt.Errorf("err: %s", err.Error()))
+			SvcErrorReturn(w, fmt.Errorf("handleBook: err: %s", err.Error()))
 			return
 		}
 		if queueItem.MachineID != rebookRequest.MachineID {
 			log.Printf("*** WARNING *** Granted MachineID %s rebooking for SID %d originally assigned to MachineID %s", rebookRequest.MachineID, rebookRequest.SID, queueItem.MachineID)
 		}
 	default:
-		SvcErrorReturn(w, fmt.Errorf("invalid command"))
+		SvcErrorReturn(w, fmt.Errorf("handleBook: invalid command"))
 		return
 	}
 
@@ -436,7 +426,7 @@ func handleBook(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	configDir := filepath.Join(app.QdConfigsDir, fmt.Sprintf("%d", queueItem.SID))
 	configFilename, err := findConfigFile(configDir)
 	if err != nil {
-		SvcErrorReturn(w, fmt.Errorf("error finding config file: %s", err.Error()))
+		SvcErrorReturn(w, fmt.Errorf("handleBook: error finding config file: %s", err.Error()))
 		return
 	}
 
@@ -457,11 +447,11 @@ func handleBook(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	//-------------------------
 	jsonWriter, err := multipartWriter.CreateFormField("json")
 	if err != nil {
-		SvcErrorReturn(w, fmt.Errorf("failed to create JSON part"))
+		SvcErrorReturn(w, fmt.Errorf("handleBook: failed to create JSON part"))
 		return
 	}
 	if err := json.NewEncoder(jsonWriter).Encode(response); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("failed to encode JSON response"))
+		SvcErrorReturn(w, fmt.Errorf("handleBook: failed to encode JSON response"))
 		return
 	}
 
@@ -471,18 +461,18 @@ func handleBook(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	configFilePath := filepath.Join(app.QdConfigsDir, fmt.Sprintf("%d", queueItem.SID), response.ConfigFilename)
 	configFile, err := os.Open(configFilePath)
 	if err != nil {
-		SvcErrorReturn(w, fmt.Errorf("failed to open config file"))
+		SvcErrorReturn(w, fmt.Errorf("handleBook: failed to open config file"))
 		return
 	}
 	defer configFile.Close()
 
 	fileWriter, err := multipartWriter.CreateFormFile("file", response.ConfigFilename)
 	if err != nil {
-		SvcErrorReturn(w, fmt.Errorf("failed to create file part"))
+		SvcErrorReturn(w, fmt.Errorf("handleBook: failed to create file part"))
 		return
 	}
 	if _, err := io.Copy(fileWriter, configFile); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("failed to send config file"))
+		SvcErrorReturn(w, fmt.Errorf("handleBook: failed to send config file"))
 		return
 	}
 
@@ -490,7 +480,7 @@ func handleBook(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	// Close the multipart writer
 	//----------------------------
 	if err := multipartWriter.Close(); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("failed to close multipart writer"))
+		SvcErrorReturn(w, fmt.Errorf("handleBook: failed to close multipart writer"))
 		return
 	}
 
@@ -504,10 +494,9 @@ func handleBook(w http.ResponseWriter, r *http.Request, d *HInfo) {
 		queueItem.MachineID = bookingRequest.MachineID
 	}
 	if err := app.qm.UpdateItem(queueItem); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("failed to update queue item"))
+		SvcErrorReturn(w, fmt.Errorf("handleBook: failed to update queue item"))
 		return
 	}
-
 }
 
 // handleNewSimulation handles the NewSimulation command
@@ -521,7 +510,7 @@ func handleNewSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	//-----------------------------------------------------------
 	var req CreateQueueEntryRequest
 	if err := json.Unmarshal(d.cmd.Data, &req); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("failed to unmarshal request data"))
+		SvcErrorReturn(w, fmt.Errorf("handleNewSimulation: failed to unmarshal request data"))
 		return
 	}
 
@@ -530,13 +519,13 @@ func handleNewSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	//------------------------------
 	file, _, err := r.FormFile("file")
 	if err != nil {
-		SvcErrorReturn(w, fmt.Errorf("failed to get file from form"))
+		SvcErrorReturn(w, fmt.Errorf("handleNewSimulation: failed to get file from form"))
 		return
 	}
 	defer file.Close()
 	fileContent, err := io.ReadAll(file)
 	if err != nil {
-		SvcErrorReturn(w, fmt.Errorf("failed to read file content"))
+		SvcErrorReturn(w, fmt.Errorf("handleNewSimulation: failed to read file content"))
 		return
 	}
 
@@ -545,7 +534,7 @@ func handleNewSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	//----------------------------------------------
 	err = os.MkdirAll(app.QdConfigsDir, os.ModePerm)
 	if err != nil {
-		LogAndErrorReturn(w, fmt.Errorf("failed to create directory: %v", err))
+		LogAndErrorReturn(w, fmt.Errorf("handleNewSimulation: failed to create directory: %v", err))
 		return
 	}
 
@@ -554,12 +543,12 @@ func handleNewSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	//----------------------------------------------
 	tempFile, err := os.CreateTemp(app.QdConfigsDir, "config-*.json5")
 	if err != nil {
-		LogAndErrorReturn(w, fmt.Errorf("failed to create directory %s: %v", app.QdConfigsDir, err))
+		LogAndErrorReturn(w, fmt.Errorf("handleNewSimulation: failed to create temp file in directory %s: %v", app.QdConfigsDir, err))
 		return
 	}
 	defer tempFile.Close()
 	if len(fileContent) == 0 {
-		LogAndErrorReturn(w, fmt.Errorf("no file content. 0-length file"))
+		LogAndErrorReturn(w, fmt.Errorf("handleNewSimulation: no file content. 0-length file"))
 		return
 	}
 
@@ -567,7 +556,7 @@ func handleNewSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	// Write the file content to a TEMPORARY file
 	//----------------------------------------------
 	if _, err := tempFile.Write(fileContent); err != nil {
-		LogAndErrorReturn(w, fmt.Errorf("failed to write file content: %v", err))
+		LogAndErrorReturn(w, fmt.Errorf("handleNewSimulation: failed to write file content: %v", err))
 		return
 	}
 
@@ -585,7 +574,7 @@ func handleNewSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	}
 	sid, err := app.qm.InsertItem(queueItem)
 	if err != nil {
-		LogAndErrorReturn(w, fmt.Errorf("failed to insert new item to database: %v", err))
+		LogAndErrorReturn(w, fmt.Errorf("handleNewSimulation: failed to insert new item to database: %v", err))
 		return
 	}
 
@@ -595,7 +584,7 @@ func handleNewSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	fpath := filepath.Join(app.QdConfigsDir, fmt.Sprintf("%d", sid))
 	err = os.MkdirAll(fpath, os.ModePerm)
 	if err != nil {
-		LogAndErrorReturn(w, fmt.Errorf("failed to make directory %s: %v", fpath, err))
+		LogAndErrorReturn(w, fmt.Errorf("handleNewSimulation: failed to make directory %s: %v", fpath, err))
 		return
 	}
 
@@ -604,7 +593,7 @@ func handleNewSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	//---------------------------------------------------------------------
 	newFilePath := filepath.Join(app.QdConfigsDir, fmt.Sprintf("%d", sid), req.OriginalFilename)
 	if err := os.Rename(tempFile.Name(), newFilePath); err != nil {
-		LogAndErrorReturn(w, fmt.Errorf("failed to rename %s to %s: %v", tempFile.Name(), newFilePath, err))
+		LogAndErrorReturn(w, fmt.Errorf("handleNewSimulation: failed to rename %s to %s: %v", tempFile.Name(), newFilePath, err))
 		return
 	}
 
@@ -731,11 +720,9 @@ func handleUpdateItem(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	// only set the fields supplied by the caller...
 	//--------------------------------------------------------
 	if err := json.Unmarshal(d.cmd.Data, &req); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("invalid request data"))
+		SvcErrorReturn(w, fmt.Errorf("handleUpdateItem: invalid request data"))
 		return
 	}
-
-	// fmt.Printf("RECEIVED -UpdateItem: %+v\n", req)
 
 	//--------------------------------------------------------
 	// load the existing item to establish the base values
@@ -743,9 +730,9 @@ func handleUpdateItem(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	queueItem, err := app.qm.GetItemByID(req.SID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			SvcErrorReturn(w, fmt.Errorf("queue item %d not found", req.SID))
+			SvcErrorReturn(w, fmt.Errorf("handleUpdateItem: queue item %d not found", req.SID))
 		} else {
-			SvcErrorReturn(w, fmt.Errorf("error in GetItemByID: %v", err))
+			SvcErrorReturn(w, fmt.Errorf("handleUpdateItem: error in GetItemByID: %v", err))
 		}
 		return
 	}
@@ -769,7 +756,7 @@ func handleUpdateItem(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	if req.DtEstimate != z && len(req.DtEstimate) > 0 {
 		dt, err := util.StringToDate(req.DtEstimate)
 		if err != nil {
-			SvcErrorReturn(w, fmt.Errorf("invalid date: %s", req.DtEstimate))
+			SvcErrorReturn(w, fmt.Errorf("handleUpdateItem: invalid date: %s", req.DtEstimate))
 			return
 		}
 		queueItem.DtEstimate.Time = dt
@@ -779,7 +766,7 @@ func handleUpdateItem(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	if req.DtCompleted != z && len(req.DtCompleted) > 0 {
 		dt, err := util.StringToDate(req.DtCompleted)
 		if err != nil {
-			SvcErrorReturn(w, fmt.Errorf("invalid date: %s", req.DtCompleted))
+			SvcErrorReturn(w, fmt.Errorf("handleUpdateItem: invalid date: %s", req.DtCompleted))
 			return
 		}
 		queueItem.DtCompleted.Time = dt
@@ -788,7 +775,7 @@ func handleUpdateItem(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	}
 
 	if err := app.qm.UpdateItem(queueItem); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("failed to update queue item"))
+		SvcErrorReturn(w, fmt.Errorf("handleUpdateItem: failed to update queue item"))
 		return
 	}
 

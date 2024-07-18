@@ -182,7 +182,7 @@ func TestHandleUpdateItem(t *testing.T) {
 		err = json.Unmarshal(bodyBytes, &response)
 		assert.NoError(t, err)
 		assert.Equal(t, response.Status, "error")
-		assert.Equal(t, response.Message, "queue item 999999 not found")
+		assert.Equal(t, response.Message, "handleUpdateItem: queue item 999999 not found")
 	})
 
 	t.Run("InvalidDate", func(t *testing.T) {
@@ -202,6 +202,6 @@ func TestHandleUpdateItem(t *testing.T) {
 		err = json.Unmarshal(bodyBytes, &response)
 		assert.NoError(t, err)
 		assert.Equal(t, response.Status, "error")
-		assert.Equal(t, response.Message, "invalid date: invalid-date")
+		assert.Equal(t, response.Message, "handleUpdateItem: invalid date: invalid-date")
 	})
 }
