@@ -33,7 +33,7 @@ func (sim *Simulation) sendEndSimulationRequest() error {
 	//------------------------------------
 	file, err := os.Open(filePath + "/" + filename)
 	if err != nil {
-		return fmt.Errorf("failed to open file: %w", err)
+		return fmt.Errorf("sendEndSimulationRequest: failed to open file: %w", err)
 	}
 	defer file.Close()
 
@@ -54,12 +54,12 @@ func (sim *Simulation) sendEndSimulationRequest() error {
 	}
 	jsonData, err := json.Marshal(cmd)
 	if err != nil {
-		return fmt.Errorf("failed to marshal JSON data: %w", err)
+		return fmt.Errorf("sendEndSimulationRequest: failed to marshal JSON data: %w", err)
 	}
 
 	err = writer.WriteField("data", string(jsonData))
 	if err != nil {
-		return fmt.Errorf("failed to write JSON data: %w", err)
+		return fmt.Errorf("sendEndSimulationRequest: failed to write JSON data: %w", err)
 	}
 
 	//------------------------------------
@@ -67,11 +67,11 @@ func (sim *Simulation) sendEndSimulationRequest() error {
 	//------------------------------------
 	filePart, err := writer.CreateFormFile("file", filepath.Base(filename))
 	if err != nil {
-		return fmt.Errorf("failed to create file part: %w", err)
+		return fmt.Errorf("sendEndSimulationRequest: failed to create file part: %w", err)
 	}
 	_, err = io.Copy(filePart, file)
 	if err != nil {
-		return fmt.Errorf("failed to copy file data: %w", err)
+		return fmt.Errorf("sendEndSimulationRequest: failed to copy file data: %w", err)
 	}
 
 	//------------------------------------
@@ -79,7 +79,7 @@ func (sim *Simulation) sendEndSimulationRequest() error {
 	//------------------------------------
 	err = writer.Close()
 	if err != nil {
-		return fmt.Errorf("failed to close multipart writer: %w", err)
+		return fmt.Errorf("sendEndSimulationRequest: failed to close multipart writer: %w", err)
 	}
 
 	//------------------------------------
@@ -87,14 +87,14 @@ func (sim *Simulation) sendEndSimulationRequest() error {
 	//------------------------------------
 	req, err := http.NewRequest("POST", app.cfg.FQDispatcherURL, body)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return fmt.Errorf("sendEndSimulationRequest: failed to create request: %w", err)
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to send request: %w", err)
+		return fmt.Errorf("sendEndSimulationRequest: failed to send request: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -102,7 +102,7 @@ func (sim *Simulation) sendEndSimulationRequest() error {
 	// Check for successful response
 	//------------------------------------
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		return fmt.Errorf("sendEndSimulationRequest: unexpected status code: %d", resp.StatusCode)
 	}
 
 	//------------------------------------
@@ -110,12 +110,14 @@ func (sim *Simulation) sendEndSimulationRequest() error {
 	//------------------------------------
 	err = os.RemoveAll(filePath)
 	if err != nil {
-		return fmt.Errorf("failed to remove directory: %w", err)
+		return fmt.Errorf("sendEndSimulationRequest: failed to remove directory: %w", err)
 	}
 
 	//--------------------------------------
 	// REMOVE THE SIMULATION FROM APP.SIMS
 	//--------------------------------------
+	app.simsMu.Lock() // Lock the mutex before modifying app.sims
+	defer app.simsMu.Unlock()
 	for i, s := range app.sims {
 		if s.SID == sim.SID {
 			app.sims = append(app.sims[:i], app.sims[i+1:]...) // Remove sim from app.sims

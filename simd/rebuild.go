@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/stmansour/simq/data"
 	"github.com/stmansour/simq/util"
@@ -71,7 +72,7 @@ func RebuildSimulatorList() error {
 	dirPath := filepath.Join(app.cfg.SimdSimulationsDir, "simulations")
 	dir, err := os.ReadDir(dirPath)
 	if err != nil {
-        log.Printf("RebuildSimulatorList: error reading directory: %s: %v\n",dirPath,err)
+		log.Printf("RebuildSimulatorList: error reading directory: %s: %v\n", dirPath, err)
 	}
 	for _, entry := range dir {
 		if entry.IsDir() {
@@ -138,6 +139,14 @@ func RebuildSimulatorList() error {
 	// ANALYZE AND TRY TO RECOVER THE REMAINING ITEMS IN THE DISPATCHER'S LIST
 	//-------------------------------------------------------------------------
 	for i := 0; i < len(resp.Data); i++ {
+
+		for len(app.sims) >= app.cfg.MaxSimulations {
+			time.Sleep(4 * time.Second) // Wait for a specified interval before checking again
+		}
+
+		//----------------------------------------------------------------
+		// Now that we can accommodate another simulation, take action...
+		//----------------------------------------------------------------
 		switch resp.Data[i].State {
 		case data.StateBooked:
 			recoverBookedSimulation(&resp.Data[i])
@@ -146,6 +155,7 @@ func RebuildSimulatorList() error {
 		case data.StateCompleted:
 			recoverArchiveSimResults(&resp.Data[i])
 		}
+
 	}
 
 	return nil

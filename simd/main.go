@@ -9,6 +9,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/stmansour/simq/util"
@@ -53,6 +54,7 @@ type SimulatorStatus struct {
 var app struct {
 	cfg         SimdConfig   // configuration of this machine
 	sims        []Simulation // currently running simulations
+	simsMu      sync.Mutex   // mutex for updating sims
 	HexASCIIDbg bool         // if true print reply buffers in hex and ASCII
 	HTTPHdrsDbg bool         // if true print HTTP headers
 	version     bool
