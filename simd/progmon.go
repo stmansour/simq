@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"syscall"
 	"time"
 )
 
@@ -35,7 +36,7 @@ type Simulation struct {
 //
 // -----------------------------------------------------------------------------
 func startSimulator(sid int64, FQConfigFileName string) error {
-	log.Printf("Starting simulation %d\n", sid)
+	log.Printf("startSimulator: %d\n", sid)
 	//-------------------------------------------------------------
 	// Start the simulator
 	// Simulator needs to run in ./simulator/<sid>/
@@ -57,7 +58,7 @@ func startSimulator(sid int64, FQConfigFileName string) error {
 	//----------------------------------------------
 	outputFile, err := os.Create(logFile)
 	if err != nil {
-		return fmt.Errorf("failed to create log file: %v", err)
+		return fmt.Errorf("startSimulator: SID=%d, failed to create log file: %v", sid, err)
 	}
 	cmd.Stdout = outputFile
 	cmd.Stderr = outputFile
@@ -66,35 +67,35 @@ func startSimulator(sid int64, FQConfigFileName string) error {
 	// Detach the process. We don't want it to stop
 	// if this process exits or dies
 	//----------------------------------------------
-	//cmd.SysProcAttr = &syscall.SysProcAttr{
-	//	Setpgid: true,
-	//	Pgid:    0,
-	//}
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Setpgid: true,
+		Pgid:    0,
+	}
 
 	//----------------------------------------------
 	// Start the process
 	//----------------------------------------------
 	if err := cmd.Start(); err != nil {
 		outputFile.Close()
-		return fmt.Errorf("failed to start simulator: %v", err)
+		return fmt.Errorf("startSimulator: SID=%d, failed to start simulator: %v", sid, err)
 	}
 
-	log.Printf("startSimulator: simulator started\n")
+	log.Printf("startSimulator: SID=%d, simulator started\n", sid)
 
 	//----------------------------------------------
 	// Detach the process. We don't want it to stop
 	// if this process exits or dies
 	//----------------------------------------------
-	//if err := cmd.Process.Release(); err != nil {
-	//	return fmt.Errorf("failed to detach simulator process: %v", err)
-	//}
+	if err := cmd.Process.Release(); err != nil {
+		return fmt.Errorf("startSimulator: SID=%d, failed to detach simulator process: %v", sid, err)
+	}
 
 	//----------------------------------------------------
 	// Creating process no longer needs this file handle
 	//----------------------------------------------------
 	outputFile.Close()
 
-	//log.Printf("startSimulator: simulator process released\n")
+	log.Printf("startSimulator: SID=%d, simulator process released\n", sid)
 
 	//---------------------------------------------------------------
 	// we have a new simulation in process. Add it to the list...
@@ -116,7 +117,7 @@ func startSimulator(sid int64, FQConfigFileName string) error {
 
 // Monitor the simulator process
 func monitorSimulator(sim *Simulation) {
-	log.Printf("simd >>>> monitorSimulator: monitoring simulator for SID %d @ %s\n", sim.SID, sim.BaseURL)
+	log.Printf("monitorSimulator: monitoring simulator for SID %d @ %s\n", sim.SID, sim.BaseURL)
 
 	//-----------------------------------------------------------------
 	// In some cases, the simulator may already be running. But
@@ -140,7 +141,7 @@ func monitorSimulator(sim *Simulation) {
 		}
 		log.Printf("monitorSimulator: found running simulator for SID %d @ %s\n", sim.SID, sim.BaseURL)
 	} else {
-		log.Printf("simd >>>> Simulator @ %s\n", sim.BaseURL)
+		log.Printf("monitorSimulator: simulator @ %s\n", sim.BaseURL)
 	}
 
 	//-------------------------------------------------------------
@@ -156,7 +157,7 @@ func monitorSimulator(sim *Simulation) {
 	for range ticker.C {
 		// log.Printf("simd >>>> ticker loop >>>> Simulator @ %s is still running\n", sim.BaseURL)
 		if !sim.isSimulatorRunning() {
-			log.Printf("SID: %d, simulator @ %s is no longer running",sim.SID, sim.BaseURL)
+			log.Printf("SID: %d, simulator @ %s is no longer running", sim.SID, sim.BaseURL)
 			break
 		}
 	}
@@ -166,16 +167,16 @@ func monitorSimulator(sim *Simulation) {
 	//-------------------------------------------------------------
 	log.Printf("Simulator @ %s is no longer running.\n", sim.BaseURL)
 	if err := sim.archiveSimulationResults(); err != nil {
-		log.Printf("SID: %d, failed to archive simulation results: %v",sim.SID, err)
+		log.Printf("monitorSimulator: SID: %d, failed to archive simulation results: %v", sim.SID, err)
 		return
 	}
-	log.Printf("Archived simulation results to %s\n", sim.Directory)
+	log.Printf("monitorSimulator: SID: %d, Archived simulation results to %s\n", sim.SID, sim.Directory)
 
 	//-----------------------------------------
 	// Send the results to the dispatcher
 	//-----------------------------------------
 	if err := sim.sendEndSimulationRequest(); err != nil {
-		log.Printf("SID: %d, failed to send end simulation request: %v", sim.SID, err)
+		log.Printf("monitorSimulator: SID: %d, failed to send EndSimulation request: %v", sim.SID, err)
 		return
 	}
 }
@@ -184,23 +185,23 @@ func monitorSimulator(sim *Simulation) {
 func (sim *Simulation) isSimulatorRunning() bool {
 	resp, err := http.Get(sim.FQSimStatusURL)
 	if err != nil {
-		log.Printf("failed to get simulator status: %v", err)
+		log.Printf("isSimulatorRunning: SID=%d failed to get simulator status: %v", sim.SID, err)
 		return false
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Printf("error reading response body: %v", err)
+		log.Printf("isSimulatorRunning: SID=%d error reading response body: %v", sim.SID, err)
 		return false
 	}
 	if resp.StatusCode != http.StatusOK {
-		log.Printf("server returned error status: %s", resp.Status)
+		log.Printf("isSimulatorRunning: SID=%d server returned error status: %s", sim.SID, resp.Status)
 	}
 	var status SimulatorStatus
 	err = json.Unmarshal(body, &status)
 	if err != nil {
-		log.Printf("error unmarshaling response body: %v", err)
+		log.Printf("isSimulatorRunning: SID=%d error unmarshaling response body: %v", sim.SID, err)
 		return false
 	}
 	return true
@@ -210,12 +211,14 @@ func (sim *Simulation) isSimulatorRunning() bool {
 // to a tar.gz file
 // -----------------------------------------------------------------------------------
 func (sim *Simulation) archiveSimulationResults() error {
+	log.Printf("archiveSimulationResults: SID = %d, directory = %s\n", sim.SID, sim.Directory)
+
 	//------------------------------------
 	// Save the current working directory
 	//------------------------------------
 	originalDir, err := os.Getwd()
 	if err != nil {
-		return fmt.Errorf("failed to get current directory: %w", err)
+		return fmt.Errorf("archiveSimulationResults: SID=%d, failed to get current directory: %w", sim.SID, err)
 	}
 
 	//------------------------------------
@@ -223,7 +226,7 @@ func (sim *Simulation) archiveSimulationResults() error {
 	//------------------------------------
 	err = os.Chdir(sim.Directory)
 	if err != nil {
-		return fmt.Errorf("failed to change to simulation directory: %w", err)
+		return fmt.Errorf("archiveSimulationResults: SID=%d, failed to change to simulation directory: %w", sim.SID, err)
 	}
 
 	//------------------------------------------------------------------
@@ -253,13 +256,13 @@ func (sim *Simulation) archiveSimulationResults() error {
 	for _, pattern := range patterns {
 		matches, err := filepath.Glob(pattern)
 		if err != nil {
-			return fmt.Errorf("failed to find files matching pattern %s: %w", pattern, err)
+			return fmt.Errorf("archiveSimulationResults: SID=%d, failed to find files matching pattern %s: %w", sim.SID, pattern, err)
 		}
 
 		for _, filePath := range matches {
 			err = addFileToTar(tarWriter, filePath)
 			if err != nil {
-				return fmt.Errorf("failed to add file %s to archive: %w", filePath, err)
+				return fmt.Errorf("archiveSimulationResults: SID=%d, failed to add file %s to archive: %w", sim.SID, filePath, err)
 			}
 		}
 	}
