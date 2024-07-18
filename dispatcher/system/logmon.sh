@@ -5,6 +5,12 @@ LOG_DIR=$(dirname "$LOG_FILE")
 LOG_FILENAME=$(basename "$LOG_FILE")
 TAILPID=0
 
+# Function to set the terminal window title
+setWindowTitle() {
+    local title="$1"
+    echo -ne "\033]0;$title\007"
+}
+
 # Check if inotifywait is installed
 if ! command -v inotifywait &> /dev/null; then
   echo "inotifywait not found. Please install the inotify-tools package."
@@ -49,9 +55,11 @@ fi
 case "$1" in
     disp)
         LOG_FILE="/usr/local/simq/dispatcher/dispatcher.log"  # Replace with the actual path
+        setWindowTitle "DISPATCHER LOG"
         ;;
     simd)
         LOG_FILE="/usr/local/simq/simd/simd.log"  # Replace with the actual path
+        setWindowTitle "SIMD LOG"
         ;;
     *)
         echo "Invalid option: $1"

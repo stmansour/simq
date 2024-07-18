@@ -37,7 +37,7 @@ CREATE TABLE `Queue` (
   `Created` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `Modified` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`SID`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -46,7 +46,7 @@ CREATE TABLE `Queue` (
 
 LOCK TABLES `Queue` WRITE;
 /*!40000 ALTER TABLE `Queue` DISABLE KEYS */;
-INSERT INTO `Queue` VALUES (1,'fast.json5','testguy','Test 1',5,'Recovery Test Case 1','7cf2ec5736624ae680e87e3587c5faec',' ',1,NULL,NULL,'2024-07-17 23:47:26','2024-07-18 00:11:33'),(2,'fast.json5','testguy','Test 2',5,'Recovery Test Case 2','7cf2ec5736624ae680e87e3587c5faec',' ',1,NULL,NULL,'2024-07-17 23:47:26','2024-07-18 00:11:33');
+INSERT INTO `Queue` VALUES (1,'fast.json5','testguy','Test 1',5,'Recovery Test Case 1','7cf2ec5736624ae680e87e3587c5faec',' ',1,NULL,NULL,'2024-07-17 23:47:26','2024-07-18 00:11:33'),(2,'fast.json5','testguy','Test 2',5,'Recovery Test Case 2','7cf2ec5736624ae680e87e3587c5faec',' ',1,NULL,NULL,'2024-07-17 23:47:26','2024-07-18 00:11:33'),(3,'med.json5','testguy','Test 3',5,'Recovery: attach to running simulator','7cf2ec5736624ae680e87e3587c5faec',' ',2,NULL,NULL,'2024-07-18 02:02:21','2024-07-18 02:07:48');
 /*!40000 ALTER TABLE `Queue` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -59,4 +59,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2024-07-17 17:11:48
+-- Dump completed on 2024-07-17 19:08:07
