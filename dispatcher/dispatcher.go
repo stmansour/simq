@@ -222,7 +222,7 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) { // 
 	var cmd EndSimulationRequest
 
 	if err := json.Unmarshal(d.BodyBytes, &cmd); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("invalid end simulation request data"))
+        SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: invalid end simulation request data"))
 		return
 	}
 
@@ -250,7 +250,7 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) { // 
 	// CREATE THE FULL PATH
 	//--------------------------------------------------
 	if err := os.MkdirAll(dirPath, os.ModePerm); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("failed to create directory: %v", err))
+        SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to create directory: %v", err))
 		return
 	}
 
@@ -259,13 +259,13 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) { // 
 	//----------------------------------------------------
 	file, _, err := r.FormFile("file")
 	if err != nil {
-		SvcErrorReturn(w, fmt.Errorf("failed to get file from form"))
+        SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to get file from form"))
 		return
 	}
 	defer file.Close()
 	fileContent, err := io.ReadAll(file)
 	if err != nil {
-		SvcErrorReturn(w, fmt.Errorf("failed to read file content"))
+        SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to read file content"))
 		return
 	}
 
@@ -274,12 +274,12 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) { // 
 	//----------------------------------------------
 	tarz, err := os.Create(filename)
 	if err != nil {
-		LogAndErrorReturn(w, fmt.Errorf("failed to create file %s: %v", filename, err))
+        LogAndErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to create file %s: %v", filename, err))
 		return
 	}
 	defer tarz.Close()
 	if len(fileContent) == 0 {
-		LogAndErrorReturn(w, fmt.Errorf("no file content. 0-length file"))
+        LogAndErrorReturn(w, fmt.Errorf("handleEndSimulation: no file content. 0-length file"))
 		return
 	}
 
@@ -287,7 +287,7 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) { // 
 	// WRITE THE TAR.GZ FILE
 	//----------------------------------------------
 	if _, err := tarz.Write(fileContent); err != nil {
-		LogAndErrorReturn(w, fmt.Errorf("failed to write file content: %v", err))
+        LogAndErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to write file content: %v", err))
 		return
 	}
 
@@ -296,22 +296,35 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) { // 
 	//----------------------------------------------
 	originalDir, err := os.Getwd() // Save the current directory
 	if err != nil {
-		log.Fatalf("failed to get current directory: %v", err)
+	    LogAndErrorReturn(w, fmt.Errorf("failed to get current directory: %v", err))
 	}
 	err = os.Chdir(dirPath) // Change to the target directory
 	if err != nil {
-		log.Fatalf("failed to change directory to %s: %v", dirPath, err)
+	    LogAndErrorReturn(w, fmt.Errorf("failed to change directory to %s: %v", dirPath, err))
 	}
-	tcmd := exec.Command("tar", "xzf", "results.tar.gz") // Execute the tar command
-	tcmd.Stdout = os.Stdout
-	tcmd.Stderr = os.Stderr
-	err = tcmd.Run()
+
+	//----------------------------------------------------------------------
+	// tar has actually failed here.  We'll implement retry logic...
+	//----------------------------------------------------------------------
+	const maxRetries = 3
+	const retryDelay = 2 * time.Second
+	for i := 0; i < maxRetries; i++ {
+		err = executeTarCommand()
+		if err == nil {
+			break
+		}
+		log.Printf("handleEndSimulation: failed to execute tar command (attempt %d/%d): %v", i+1, maxRetries, err)
+		time.Sleep(retryDelay)
+	}
 	if err != nil {
-		log.Fatalf("failed to execute tar command: %v", err)
+        LogAndErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to execute tar command after %d attempts: %v", maxRetries, err))
+        return
 	}
+
+
 	err = os.Chdir(originalDir) // Return back to the original directory
 	if err != nil {
-		log.Fatalf("failed to change back to the original directory: %v", err)
+        LogAndErrorReturn(w,fmt.Errorf("handleEndSimulation: failed to change back to the original directory: %v", err))
 	}
 
 	//----------------------------
@@ -354,6 +367,13 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) { // 
 		Message: "Results stored in: " + dirPath,
 	}
 	SvcWriteResponse(w, &resp)
+}
+
+func executeTarCommand() error {
+	tcmd := exec.Command("tar", "xzf", "results.tar.gz")
+	tcmd.Stdout = os.Stdout
+	tcmd.Stderr = os.Stderr
+	return tcmd.Run()
 }
 
 // handleBook handles the Book command

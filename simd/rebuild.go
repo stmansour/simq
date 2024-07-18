@@ -71,7 +71,7 @@ func RebuildSimulatorList() error {
 	dirPath := filepath.Join(app.cfg.SimdSimulationsDir, "simulations")
 	dir, err := os.ReadDir(dirPath)
 	if err != nil {
-		log.Fatal(err)
+        log.Printf("RebuildSimulatorList: error reading directory: %s: %v\n",dirPath,err)
 	}
 	for _, entry := range dir {
 		if entry.IsDir() {
@@ -387,7 +387,7 @@ func (sim *Simulation) FindRunningSimulator() bool {
 			// The simulator is still running.  Save the URL
 			// and continue to monitor it as usual
 			//----------------------------------------------------
-			log.Printf("simd:  >>>>    **** CONNECTED ****   Connected with running simulatorfor SID = %d on port %d\n", sim.SID, port)
+			log.Printf("simd:  >>>>    **** CONNECTED ****   Connected with simulatorfor SID = %d on port %d\n", sim.SID, port)
 			sim.SimPort = port
 			sim.BaseURL = fmt.Sprintf("http://127.0.0.1:%d", port)
 			sim.FQSimStatusURL = url

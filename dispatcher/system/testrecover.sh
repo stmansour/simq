@@ -14,6 +14,7 @@
 PLATOMACHINEID="7cf2ec5736624ae680e87e3587c5faec"
 
 ./shutdown.sh
+./clean.sh
 ./setup.sh
 
 #---------------------------------------------------------------------

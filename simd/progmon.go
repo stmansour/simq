@@ -150,15 +150,13 @@ func monitorSimulator(sim *Simulation) {
 	ticker := time.NewTicker(1 * time.Minute) // set this to 5 minutes after debugging
 	defer ticker.Stop()
 
-	log.Printf("simd >>>> ticker loop >>>> timer set for 1 minute intervals\n")
-
 	//-------------------------------------------------------------
 	// Periodically ping the simulator to check its status
 	//-------------------------------------------------------------
 	for range ticker.C {
 		// log.Printf("simd >>>> ticker loop >>>> Simulator @ %s is still running\n", sim.BaseURL)
 		if !sim.isSimulatorRunning() {
-			log.Printf("Simulator @ %s is no longer running", sim.BaseURL)
+			log.Printf("SID: %d, simulator @ %s is no longer running",sim.SID, sim.BaseURL)
 			break
 		}
 	}
@@ -168,7 +166,7 @@ func monitorSimulator(sim *Simulation) {
 	//-------------------------------------------------------------
 	log.Printf("Simulator @ %s is no longer running.\n", sim.BaseURL)
 	if err := sim.archiveSimulationResults(); err != nil {
-		log.Printf("Failed to archive simulation results: %v", err)
+		log.Printf("SID: %d, failed to archive simulation results: %v",sim.SID, err)
 		return
 	}
 	log.Printf("Archived simulation results to %s\n", sim.Directory)
@@ -177,7 +175,7 @@ func monitorSimulator(sim *Simulation) {
 	// Send the results to the dispatcher
 	//-----------------------------------------
 	if err := sim.sendEndSimulationRequest(); err != nil {
-		log.Printf("Failed to send end simulation request: %v", err)
+		log.Printf("SID: %d, failed to send end simulation request: %v", sim.SID, err)
 		return
 	}
 }
