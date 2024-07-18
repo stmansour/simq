@@ -210,6 +210,22 @@ func recoverArchiveSimResults(qi *data.QueueItem) {
 	// IF IT WASN'T FOUND, CREATE IT
 	//--------------------------------
 	if !found {
+		//-----------------------------------------
+		// DO WE HAVE FINREP.CSV or SIMSTATS.CSV
+		//-----------------------------------------
+		for i := 0; i < len(files); i++ {
+			if files[i] == "finrep.csv" || files[i] == "simstats.csv" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			log.Printf("simd >>>> NO RESULTS FROM SIMULATOR FOUND for SID: %d\n", sim.SID)
+			log.Printf("simd >>>> REBOOKING SID: %d TO PROPERLY GENERATE RESULTS\n", sim.SID)
+			bookAndRunSimulation("Rebook", sim.SID)
+			return
+		}
+
 		err = sim.archiveSimulationResults()
 		if err != nil {
 			log.Printf("simd >>>> Simulation: %d - error creating results archive in %s: error: %v\n", sim.SID, sim.Directory, err)
