@@ -157,13 +157,13 @@ func RebuildSimulatorList() error {
 // existing simulator or restart it.
 // ------------------------------------------------------------------------------
 func recoverExecutingSimulation(qi *data.QueueItem) {
-	log.Printf("simd >>>> attempting to recover an executing simulation, sid = %d\n", qi.SID)
+	log.Printf("simd >>>> RECOVER EXECUTING SIMULATION - attempting to recover an executing simulation, sid = %d\n", qi.SID)
 	//----------------------------------------------
 	// IS THE SIMULATOR FOR THIS JOB STILL RUNNING?
 	//----------------------------------------------
 	sim := buildSimFromQueueItem(qi)
 	if sim.FindRunningSimulator() {
-		log.Printf("simd >>>> recovered running simulator for sid = %d\n", sim.SID)
+		log.Printf("simd >>>> connected with running simulator for sid = %d\n", sim.SID)
 		go monitorSimulator(&sim)
 		return
 	}
@@ -187,6 +187,7 @@ func recoverExecutingSimulation(qi *data.QueueItem) {
 // finished but the results were not archived. Attempt to archive them
 // -----------------------------------------------------------------------
 func recoverArchiveSimResults(qi *data.QueueItem) {
+	log.Printf("simd >>>> RECOVER ARCHIVED SIMULATION RESULTS - attempting to archive simulation results for sid = %d\n", qi.SID)
 	sim := buildSimFromQueueItem(qi)
 
 	//--------------------------------
@@ -231,8 +232,8 @@ func recoverArchiveSimResults(qi *data.QueueItem) {
 // we never go the simulator started.  Try to recover.
 // -------------------------------------------------------------------------
 func recoverBookedSimulation(qi *data.QueueItem) {
+	log.Printf("simd >>>> RECOVER BOOKED SIMULATION - attempting to recover a booked simulation, sid = %d\n", qi.SID)
 	sim := buildSimFromQueueItem(qi)
-	log.Printf("simd >>>> attempting to recover a booked simulation, sid = %d\n", qi.SID)
 
 	//-----------------------------------------------------------------
 	// Because I've seen it happen, just check to see if the simulator
