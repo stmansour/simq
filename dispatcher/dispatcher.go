@@ -340,6 +340,17 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 		return
 	}
 
+	//---------------------------------------------------------------
+	// WE NO LONGER NEED THE CONFIG FILE IN QDCONFIGS, REMOVE IT...
+	//---------------------------------------------------------------
+	configDir := filepath.Join(app.QdConfigsDir, fmt.Sprintf("%d", queueItem.SID))
+	log.Printf("handleEndSimulation: removing config directory %s\n", configDir)
+	if err := os.RemoveAll(configDir); err != nil {
+		SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: error in RemoveAll: %v", err))
+		return
+	}
+	log.Printf("handleEndSimulation: sucussfully removed %s\n", configDir)
+
 	//------------------------------
 	// SEND RESPONSE
 	//------------------------------

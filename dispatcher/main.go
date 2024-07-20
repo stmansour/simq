@@ -68,6 +68,9 @@ func doMain() {
 	}
 	defer logFile.Close()
 	log.SetOutput(logFile)
+	log.Printf("---------------------------------------------------------------------\n")
+	log.Printf("Dispatcher version: %s\n", util.Version())
+	log.Printf("Initiated: %s\n", time.Now().Format(time.RFC3339))
 
 	//-----------------------------------------
 	// READ IN CONFIGURATION
@@ -81,7 +84,6 @@ func doMain() {
 	}
 	cmd := ex.GetSQLOpenString(ex.DbName)
 	setMyNetworkAddress()
-	log.Printf("---------------------------------------------------------------------\n")
 	log.Printf("Dispatcher Network Address: %s\n", app.DispatcherURL)
 
 	//-----------------------------------------

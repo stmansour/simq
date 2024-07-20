@@ -88,6 +88,9 @@ func main() {
 	}
 	defer logFile.Close()
 	log.SetOutput(logFile)
+	log.Printf("----------------------------------------------------------------\n")
+	log.Printf("simd version: %s\n", util.Version())
+	log.Printf("Initiated: %s\n", time.Now().Format(time.RFC3339))
 
 	app.sims = make([]Simulation, 0) // initialize it empty
 

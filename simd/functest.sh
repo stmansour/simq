@@ -4,24 +4,14 @@
 #  Plato server:         7cf2ec5736624ae680e87e3587c5faec
 
 MYSQL=$(which mysql)
-echo "MYSQL = ${MYSQL}"
 
 SIMDDIR=$(grep "SimdSimulationsDir" simdconf.json5| sed 's/".*"://' | sed 's/[", ]//g')
 SIMDHOME=$(grep "SimdHome" simdconf.json5| sed 's/".*"://' | sed 's/[", ]//g')
 RESULTSDIR=$(grep "SimResultsDir" simdconf.json5| sed 's/".*"://' | sed 's/[", ]//g')
 DISPDIR=$(grep "DispatcherQueueDir" simdconf.json5| sed 's/".*"://' | sed 's/[", ]//g')
-echo "SIMDDIR = ${SIMDDIR}"
-echo "RESULTSDIR = ${RESULTSDIR}"
-echo "DISPDIR = ${DISPDIR}"
-
 YEAR=$(date +"%Y")
 MONTH=$(date +"%-m")
 DAY=$(date +"%-d")
-
-
-echo "Year: $YEAR"
-echo "Month: $MONTH"
-echo "Day: $DAY"
 
 #--------------------------------------------------------------------------------------
 # cleanDirectories removes all data files maintained by simd and dispatcher,
@@ -82,17 +72,29 @@ checkFileExists() {
 }
 
 #------------------------------------------------------------------------------
-#
+#  startSimd - kill any existing simd, then start the simd.
 #------------------------------------------------------------------------------
 startSimd() {
     killall simd >/dev/null
     ./simd &
     SIMD_PID=$!
     echo "simd started, SIMD_PID = ${SIMD_PID}"
-
 }
 
+#------------------------------------------------------------------------------
+#  loadDataset - load the dataset into the database
+#  INPUTS
+#    $1 = dataset number
+#------------------------------------------------------------------------------
+loadDataset() {
+    tar xvf "testdata/${1}/disp.tar" -C "${DISPDIR}"
+    tar xvf "testdata/${1}/simd.tar" -C "${SIMDDIR}"
+    ${MYSQL} simqtest < "testdata/${1}/simq.sql"
+}
+
+#------------------------------------------------------------------------------
 # Useful commands
+#------------------------------------------------------------------------------
 usefulCommands() {
 cat <<EOF
 Useful commands:
@@ -112,13 +114,29 @@ if [ "${HOSTNAME}" != "StevesMcBookPro.attlocal.net" ]; then
     exit 1
 fi
 
-while getopts "at:" o; do
+while getopts "acd:t:" o; do
     echo "o = ${o}"
     case "${o}" in
     a)
         ASKBEFOREEXIT=1
         echo "WILL ASK BEFORE EXITING ON ERROR"
         ;;
+
+    c)  echo -n "CLEANING DIRECTORIES..."
+        cleanDirectories
+        echo "DONE"
+        exit 0
+        ;;
+
+    d)  DATASET="${OPTARG}"
+        echo "CLEANING DIRECTORIES..."
+        cleanDirectories
+        echo "LOADING DATASET ${DATASET}..."
+        loadDataset "${DATASET}"
+        echo "DONE"
+        exit 0
+        ;;
+
     t)
         SINGLETEST="${OPTARG}"
         echo "SINGLETEST set to ${SINGLETEST}"
@@ -134,18 +152,41 @@ shift $((OPTIND - 1))
 
 #------------------------------------------------------------------------------
 #  TEST a
-#  initial dispatcher test
+#  initial dispatcher test - a simulation was booked, but no simulation
+#  directory exists
 #------------------------------------------------------------------------------
 TFILES="a"
 STEP=0
 if [[ "${SINGLETEST}${TFILES}" = "${TFILES}" || "${SINGLETEST}${TFILES}" = "${TFILES}${TFILES}" ]]; then
-    echo "test a"
+    echo "test ${TFILES} - individual test recover booked simulation, no simulation directory"
     cleanDirectories
-    tar xvf "testdata/${TFILES}/disp_1.tar" -C "${DISPDIR}"
-    tar xvf "testdata/${TFILES}/simd_1.tar" -C "${SIMDDIR}"
-    ${MYSQL} simqtest < "testdata/${TFILES}/simqtest_1.sql"
+    loadDataset 1
 
     TARGETFILE="${RESULTSDIR}/${YEAR}/${MONTH}/${DAY}/1/finrep.csv"
+    echo "Waiting for the creation of: ${TARGETFILE}"
+    startSimd
+    TIMELIMIT=20
+    usefulCommands
+    if checkFileExists "${TARGETFILE}" "${TIMELIMIT}"; then
+        echo "PASS"
+    else
+        echo "FAIL... ${TARGETFILE} was not present after ${TIMELIMIT} sec"
+    fi
+    
+    kill $SIMD_PID >/dev/null 2>&1
+fi
+
+#------------------------------------------------------------------------------
+#  TEST b
+#------------------------------------------------------------------------------
+TFILES="b"
+STEP=0
+if [[ "${SINGLETEST}${TFILES}" = "${TFILES}" || "${SINGLETEST}${TFILES}" = "${TFILES}${TFILES}" ]]; then
+    echo "test ${TFILES} - test recover booked simulation, simulation directory exists, but no config file"
+    cleanDirectories
+    loadDataset 2
+
+    TARGETFILE="${RESULTSDIR}/${YEAR}/${MONTH}/${DAY}/2/finrep.csv"
     echo "Waiting for the creation of: ${TARGETFILE}"
     startSimd
     TIMELIMIT=20
