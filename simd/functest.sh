@@ -124,6 +124,21 @@ checkResults() {
     kill $SIMD_PID >/dev/null 2>&1
 }
 
+#------------------------------------------------------------------------------
+# delayForSimulatorCheck = For this test, we want to see if simd can connect
+# with a running simulator. So we delay a bit to give simd time to do the
+# check and connect with it.  We wait 4 seconds, which should be plenty of
+# time.  Then we'll send the simulator a command to end what it's doing and
+# make sure that simd sees that it's done and sends the results to dispatcher.
+#------------------------------------------------------------------------------
+delayForSimulatorCheck() {
+    echo "Delaying for 4 seconds to let simd connect with the simulator..."
+    sleep 4
+    echo "Sending end command to simulator to end after next gen..."
+    curl http://localhost:8090/stopsim
+    checkResults
+}
+
 ###############################################################################
 #    INPUT
 ###############################################################################
@@ -242,7 +257,7 @@ fi
 TFILES="e"
 STEP=0
 if [[ "${SINGLETEST}${TFILES}" = "${TFILES}" || "${SINGLETEST}${TFILES}" = "${TFILES}${TFILES}" ]]; then
-    echo "test ${TFILES} - test recover booked simulation, simulation directory exists, results.tar.gz exists"
+    echo "test ${TFILES} - test recover booked simulation, simulation directory exists, results.tar.gz exists."
     loadDataset 5
     TARGETFILE="${RESULTSDIR}/${YEAR}/${MONTH}/${DAY}/5/finrep.csv"
     echo "Waiting for the creation of: ${TARGETFILE}"
@@ -250,6 +265,26 @@ if [[ "${SINGLETEST}${TFILES}" = "${TFILES}" || "${SINGLETEST}${TFILES}" = "${TF
     TIMELIMIT=10
     usefulCommands
     checkResults
+fi
+
+#------------------------------------------------------------------------------
+#  TEST f
+#------------------------------------------------------------------------------
+TFILES="f"
+STEP=0
+if [[ "${SINGLETEST}${TFILES}" = "${TFILES}" || "${SINGLETEST}${TFILES}" = "${TFILES}${TFILES}" ]]; then
+    echo "test ${TFILES} - test recover booked simulation, and it has a running simulator working on it."
+    loadDataset 6
+    TARGETFILE="${RESULTSDIR}/${YEAR}/${MONTH}/${DAY}/6/finrep.csv"
+    killall simulator
+    CWD=$(pwd)
+    cd /var/lib/simd/simulations/6; /usr/local/plato/bin/simulator -c med.json5 -SID 6 -DISPATCHER http://localhost:8250/ >sim.log 2>&1 &
+    cd "${CWD}"
+    startSimd
+    TIMELIMIT=120
+    usefulCommands
+    echo "Waiting for the creation of: ${TARGETFILE}"
+    delayForSimulatorCheck
 fi
 
 echo "------------------------------------------------------------------"
