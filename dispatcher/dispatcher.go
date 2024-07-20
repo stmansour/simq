@@ -376,7 +376,6 @@ func executeTarCommand() error {
 // handleBook handles the Book command
 // ---------------------------------------------------------------------------
 func handleBook(w http.ResponseWriter, r *http.Request, d *HInfo) {
-	log.Printf("*** entered: handleBook\n")
 	var queueItem data.QueueItem
 	var err error
 	//---------------------------------------------------
@@ -386,7 +385,6 @@ func handleBook(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	var rebookRequest SimulationRebookRequest
 	switch d.cmd.Command {
 	case "Book":
-		log.Printf("handling Book command\n")
 		if err := json.Unmarshal(d.cmd.Data, &bookingRequest); err != nil {
 			SvcErrorReturn(w, fmt.Errorf("handleBook: invalid booking request data"))
 			return
@@ -431,6 +429,8 @@ func handleBook(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	//-----------------------------------------------------------------------------
 	// FIND THE CONFIG FILE FOR THIS JOB
 	//-----------------------------------------------------------------------------
+	log.Printf("handleBook: processing %s command\n", d.cmd.Command)
+
 	configDir := filepath.Join(app.QdConfigsDir, fmt.Sprintf("%d", queueItem.SID))
 	configFilename, err := findConfigFile(configDir)
 	if err != nil {
