@@ -3,6 +3,7 @@ BINDIR=${TOP}/dist/simq
 THISDIR="dispatcher"
 TEST_FAILURE_FILE=fail
 BUILD_TIME := $(shell date "+%Y-%m-%d %H:%M:%S")
+MACHINENAME := $(shell hostname)
 
 dispatcher: *.go
 	go vet
@@ -37,8 +38,8 @@ package:
 release: config
 	mkdir -p /usr/local/simq/dispatcher/
 	cp dispatcher /usr/local/simq/dispatcher/
-	# cp dispatcher.json5 /usr/local/simq/dispatcher/
-	# cp extres.json5 /usr/local/simq/dispatcher/
+	@if [ "${MACHINENAME}" = "StevesMcBookPro.attlocal.net" ]; then cp dispatcher.json5 /usr/local/simq/dispatcher/; fi
+	
 
 releaseman:
 	if [ -d /usr/local/share/man/man1 ] && [ -w /usr/local/share/man/man1 ]; then cp dispatcher.1 /usr/local/share/man/man1/ ; fi

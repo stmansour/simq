@@ -113,9 +113,14 @@ func (sim *Simulation) sendEndSimulationRequest() error {
 		return fmt.Errorf("sendEndSimulationRequest: failed to remove directory: %w", err)
 	}
 
-	//--------------------------------------
-	// REMOVE THE SIMULATION FROM APP.SIMS
-	//--------------------------------------
+	RemoveSimFromList(sim)
+	return nil
+}
+
+// RemoveSimFromList removes the supplied simulation from app.sims in a
+// thread-safe way.
+// ------------------------------------------------------------------------------
+func RemoveSimFromList(sim *Simulation) {
 	app.simsMu.Lock() // Lock the mutex before modifying app.sims
 	defer app.simsMu.Unlock()
 	for i, s := range app.sims {
@@ -124,6 +129,4 @@ func (sim *Simulation) sendEndSimulationRequest() error {
 			break
 		}
 	}
-
-	return nil
 }

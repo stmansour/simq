@@ -6,5 +6,5 @@
     "SimdSimulationsDir": "/var/lib/simd",
     "DispatcherQueueDir": "/var/lib/dispatcher",
     "SimResultsDir": "/opt/TestSimResultsRepo",
-    "DispatcherURL": "http://216.16.195.147:8250/"
+    "DispatcherURL": "http://127.0.0.1:8250/"
 }

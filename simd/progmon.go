@@ -105,7 +105,9 @@ func startSimulator(sid int64, FQConfigFileName string) error {
 		Directory: Directory,
 		Cmd:       cmd,
 	}
+	app.simsMu.Lock() // Lock the mutex before modifying app.sims
 	app.sims = append(app.sims, sm)
+	app.simsMu.Unlock() // Unlock the mutex after modification
 
 	//---------------------------------------------------------------
 	// Monitor the simulator process
@@ -126,17 +128,79 @@ func monitorSimulator(sim *Simulation) {
 	// running then 3 seconds from now is not going to hurt anything.
 	//-----------------------------------------------------------------
 	time.Sleep(3 * time.Second)
-	maxRetries := 5
+	maxRetries := 3
 	if len(sim.FQSimStatusURL) == 0 {
 		for retryCount := 0; retryCount < maxRetries; retryCount++ {
+			// fmt.Printf("DEBUG: retryCount = %d\n", retryCount)
 			if !sim.FindRunningSimulator() {
-				time.Sleep(60 * time.Second) // we'll wait for 1 minute, up to 5 times
-				continue                     // try again
+				time.Sleep(3 * time.Second) // we'll wait for 1 minute, up to 5 times
+				continue                    // try again
 			}
 			break
 		}
 		if len(sim.FQSimStatusURL) == 0 {
-			log.Printf("monitorSimulator: failed to find running simulator for SID %d\n", sim.SID)
+			//------------------------------------------------------------------
+			// IT IS POSSIBLE THAT WE HAD A VERY FAST SIMULATION...
+			// CHECK TO SEE IF THE SIMULATION RESULT FILES ARE PRESENT...
+			//------------------------------------------------------------------
+			filenames, err := getFilenamesInDir(sim.Directory)
+			if err != nil {
+				//-----------------------------------------------------------
+				// Exhausted retries.  No files to be found.  This computer
+				// seems to be having difficulties.  Tell dispatcher to put
+				// it in the Error state.
+				//-----------------------------------------------------------
+				if err = ErrorEndThisSimulation(sim); err != nil {
+					log.Printf("monitorSimulator: failed ErrorEndThisSimulation for SID %d, err = %s\n", sim.SID, err.Error())
+					return
+				}
+				return
+			}
+			//---------------------------------------------
+			// Check for finrep.csv...
+			//---------------------------------------------
+			found := false
+			foundResultsTar := false
+			for i := 0; i < len(filenames); i++ {
+				if filenames[i] == "finrep.csv" {
+					found = true
+				}
+				if filenames[i] == "results.tar.gz" {
+					foundResultsTar = true
+				}
+			}
+			if !found {
+				//--------------------------------------------------------
+				// We've exhausted the retries and no files can be found
+				//--------------------------------------------------------
+				if err = ErrorEndThisSimulation(sim); err != nil {
+					log.Printf("monitorSimulator: failed ErrorEndThisSimulation for SID %d, err = %s\n", sim.SID, err.Error())
+				}
+				return
+			}
+
+			//----------------------------------------------------------------------
+			// We found all the files.  We can do a normal end for this simulation
+			//----------------------------------------------------------------------
+			if !foundResultsTar {
+				if err = sim.archiveSimulationResults(); err != nil {
+					log.Printf("monitorSimulator: failed archiveSimulationResults for SID %d, err = %s\n", sim.SID, err.Error())
+					log.Printf("monitorSimulator: removing simulation with SID %d\n", sim.SID)
+					if err = ErrorEndThisSimulation(sim); err != nil {
+						log.Printf("monitorSimulator: failed ErrorEndThisSimulation for SID %d, err = %s\n", sim.SID, err.Error())
+					}
+					return
+				}
+			}
+			if err = sim.sendEndSimulationRequest(); err != nil {
+				log.Printf("monitorSimulator: failed sendEndSimulationRequest for SID %d, err = %s\n", sim.SID, err.Error())
+				log.Printf("monitorSimulator: removing simulation with SID %d\n", sim.SID)
+				if err = ErrorEndThisSimulation(sim); err != nil {
+					log.Printf("monitorSimulator: failed ErrorEndThisSimulation for SID %d, err = %s\n", sim.SID, err.Error())
+				}
+				return
+			}
+			log.Printf("monitorSimulator: successfully ended SID %d\n", sim.SID)
 			return
 		}
 		log.Printf("monitorSimulator: found running simulator for SID %d @ %s\n", sim.SID, sim.BaseURL)
@@ -297,4 +361,19 @@ func addFileToTar(tarWriter *tar.Writer, filePath string) error {
 
 	_, err = io.Copy(tarWriter, file)
 	return err
+}
+
+// ErrorEndThisSimulation is called when this computer has exhausted all recovery
+// methods but cannot get a simulation to work.
+// ----------------------------------------------------------------------------
+func ErrorEndThisSimulation(sim *Simulation) error {
+	// TODO
+	log.Printf("*** Please implement error state\n")
+
+	//--------------------------------------
+	// REMOVE THIS SIMULATION FROM THE LIST
+	//--------------------------------------
+	RemoveSimFromList(sim)
+	log.Printf("SetToErrorState:  SID %d has been removed from app.sims\n", sim.SID)
+	return nil
 }

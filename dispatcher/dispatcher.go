@@ -116,12 +116,6 @@ var handlerTable = map[string]HandlerTableEntry{
 	"UpdateItem":        {Handler: handleUpdateItem},
 }
 
-// LogAndErrorReturn logs an error and returns an error
-func LogAndErrorReturn(w http.ResponseWriter, err error) {
-	log.Printf("Error: %v", err)
-	SvcErrorReturn(w, err)
-}
-
 // app.HTTPHdrsDbg = true
 // app.HexASCIIDbg = true
 
@@ -208,6 +202,7 @@ func commandDispatcher(w http.ResponseWriter, r *http.Request) {
 //
 // ---------------------------------------------------------------------------
 func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
+	log.Printf("*** entered: handleEndSimulation\n")
 	var cmd EndSimulationRequest
 
 	if err := json.Unmarshal(d.BodyBytes, &cmd); err != nil {
@@ -215,7 +210,7 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 		return
 	}
 
-	log.Printf("EndSimulation: SID: %d, Filename: %s\n", cmd.SID, cmd.Filename)
+	log.Printf("handleEndSimulation: SID: %d, Filename: %s\n", cmd.SID, cmd.Filename)
 
 	//----------------------------------------------------------------------------
 	// BUILD THE DESTINATION DIRECTORY
@@ -239,7 +234,7 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	// CREATE THE FULL PATH
 	//--------------------------------------------------
 	if err := os.MkdirAll(dirPath, os.ModePerm); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to create directory: %v", err))
+		SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: error from os.MkdirAll(%s): %s", dirPath, err.Error()))
 		return
 	}
 
@@ -263,12 +258,12 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	//----------------------------------------------
 	tarz, err := os.Create(filename)
 	if err != nil {
-		LogAndErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to create file %s: %v", filename, err))
+		SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to create file %s: %v", filename, err))
 		return
 	}
 	defer tarz.Close()
 	if len(fileContent) == 0 {
-		LogAndErrorReturn(w, fmt.Errorf("handleEndSimulation: no file content. 0-length file"))
+		SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: no file content. 0-length file"))
 		return
 	}
 
@@ -276,7 +271,7 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	// WRITE THE TAR.GZ FILE
 	//----------------------------------------------
 	if _, err := tarz.Write(fileContent); err != nil {
-		LogAndErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to write to file %s: %v", filename, err))
+		SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to write to file %s: %v", filename, err))
 		return
 	}
 
@@ -285,12 +280,12 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	//----------------------------------------------
 	originalDir, err := os.Getwd() // Save the current directory
 	if err != nil {
-		LogAndErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to get current directory: %v", err))
+		SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to get current directory: %v", err))
 		return
 	}
 	err = os.Chdir(dirPath) // Change to the target directory
 	if err != nil {
-		LogAndErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to change directory to %s: %v", dirPath, err))
+		SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to change directory to %s: %v", dirPath, err))
 		return
 	}
 
@@ -308,20 +303,20 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 		time.Sleep(retryDelay)
 	}
 	if err != nil {
-		LogAndErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to execute tar command after %d attempts: %v", maxRetries, err))
+		SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to execute tar command after %d attempts: %v", maxRetries, err))
 		return
 	}
 
 	err = os.Chdir(originalDir) // Return back to the original directory
 	if err != nil {
-		LogAndErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to change back to the original directory: %v", err))
+		SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to change back to the original directory: %v", err))
 	}
 
-	//----------------------------
-	// REMOVE THE TAR.GZ FILE
-	//----------------------------
+	//---------------------------------------------------------------------------------------
+	// After we have extracted the data files, we no longer need the tar.gz file. Delete it.
+	//---------------------------------------------------------------------------------------
 	if err := os.Remove(filename); err != nil {
-		LogAndErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to remove config file"))
+		SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to remove config file"))
 		return
 	}
 
@@ -331,9 +326,9 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	queueItem, err := app.qm.GetItemByID(cmd.SID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			LogAndErrorReturn(w, fmt.Errorf("handleEndSimulation: queue item %d not found", cmd.SID))
+			SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: queue item %d not found", cmd.SID))
 		} else {
-			LogAndErrorReturn(w, fmt.Errorf("handleEndSimulation: error in GetItemByID: %v", err))
+			SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: error in GetItemByID: %v", err))
 		}
 		return
 	}
@@ -341,7 +336,7 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	queueItem.State = data.StateResultsSaved
 
 	if err := app.qm.UpdateItem(queueItem); err != nil {
-		LogAndErrorReturn(w, fmt.Errorf("handleEndSimulation: error in UpdateItem: %v", err))
+		SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: error in UpdateItem: %v", err))
 		return
 	}
 
@@ -357,6 +352,7 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 		Message: "Results stored in: " + dirPath,
 	}
 	SvcWriteResponse(w, &resp)
+	log.Printf("*** handleEndSimulation:  SUCCESSFUL ***\n")
 }
 
 func executeTarCommand() error {
@@ -369,6 +365,7 @@ func executeTarCommand() error {
 // handleBook handles the Book command
 // ---------------------------------------------------------------------------
 func handleBook(w http.ResponseWriter, r *http.Request, d *HInfo) {
+	log.Printf("*** entered: handleBook\n")
 	var queueItem data.QueueItem
 	var err error
 	//---------------------------------------------------
@@ -497,13 +494,15 @@ func handleBook(w http.ResponseWriter, r *http.Request, d *HInfo) {
 		SvcErrorReturn(w, fmt.Errorf("handleBook: failed to update queue item"))
 		return
 	}
+	log.Printf("*** handleBook:  SUCCESSFUL ***\n")
+
 }
 
 // handleNewSimulation handles the NewSimulation command
 // It creates a new entry in the queue
 // ---------------------------------------------------------------------------
 func handleNewSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
-	log.Printf("dispatcher >>>> NewSimulation handler\n")
+	log.Printf("*** entered: handleNewSimulation\n")
 
 	//-----------------------------------------------------------
 	// Unmarshal the command data into CreateQueueEntryRequest
@@ -534,7 +533,7 @@ func handleNewSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	//----------------------------------------------
 	err = os.MkdirAll(app.QdConfigsDir, os.ModePerm)
 	if err != nil {
-		LogAndErrorReturn(w, fmt.Errorf("handleNewSimulation: failed to create directory: %v", err))
+		SvcErrorReturn(w, fmt.Errorf("handleNewSimulation: failed to create directory: %v", err))
 		return
 	}
 
@@ -543,12 +542,12 @@ func handleNewSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	//----------------------------------------------
 	tempFile, err := os.CreateTemp(app.QdConfigsDir, "config-*.json5")
 	if err != nil {
-		LogAndErrorReturn(w, fmt.Errorf("handleNewSimulation: failed to create temp file in directory %s: %v", app.QdConfigsDir, err))
+		SvcErrorReturn(w, fmt.Errorf("handleNewSimulation: failed to create temp file in directory %s: %v", app.QdConfigsDir, err))
 		return
 	}
 	defer tempFile.Close()
 	if len(fileContent) == 0 {
-		LogAndErrorReturn(w, fmt.Errorf("handleNewSimulation: no file content. 0-length file"))
+		SvcErrorReturn(w, fmt.Errorf("handleNewSimulation: no file content. 0-length file"))
 		return
 	}
 
@@ -556,7 +555,7 @@ func handleNewSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	// Write the file content to a TEMPORARY file
 	//----------------------------------------------
 	if _, err := tempFile.Write(fileContent); err != nil {
-		LogAndErrorReturn(w, fmt.Errorf("handleNewSimulation: failed to write file content: %v", err))
+		SvcErrorReturn(w, fmt.Errorf("handleNewSimulation: failed to write file content: %v", err))
 		return
 	}
 
@@ -574,7 +573,7 @@ func handleNewSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	}
 	sid, err := app.qm.InsertItem(queueItem)
 	if err != nil {
-		LogAndErrorReturn(w, fmt.Errorf("handleNewSimulation: failed to insert new item to database: %v", err))
+		SvcErrorReturn(w, fmt.Errorf("handleNewSimulation: failed to insert new item to database: %v", err))
 		return
 	}
 
@@ -584,7 +583,7 @@ func handleNewSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	fpath := filepath.Join(app.QdConfigsDir, fmt.Sprintf("%d", sid))
 	err = os.MkdirAll(fpath, os.ModePerm)
 	if err != nil {
-		LogAndErrorReturn(w, fmt.Errorf("handleNewSimulation: failed to make directory %s: %v", fpath, err))
+		SvcErrorReturn(w, fmt.Errorf("handleNewSimulation: failed to make directory %s: %v", fpath, err))
 		return
 	}
 
@@ -593,7 +592,7 @@ func handleNewSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	//---------------------------------------------------------------------
 	newFilePath := filepath.Join(app.QdConfigsDir, fmt.Sprintf("%d", sid), req.OriginalFilename)
 	if err := os.Rename(tempFile.Name(), newFilePath); err != nil {
-		LogAndErrorReturn(w, fmt.Errorf("handleNewSimulation: failed to rename %s to %s: %v", tempFile.Name(), newFilePath, err))
+		SvcErrorReturn(w, fmt.Errorf("handleNewSimulation: failed to rename %s to %s: %v", tempFile.Name(), newFilePath, err))
 		return
 	}
 
@@ -607,11 +606,12 @@ func handleNewSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	}
 	w.WriteHeader(http.StatusCreated)
 	SvcWriteResponse(w, &msg)
+	log.Printf("*** handleNewSimulation:  SUCCESSFUL ***\n")
 }
 
 // handleShutdown handles the Shutdown command
 func handleShutdown(w http.ResponseWriter, r *http.Request, d *HInfo) {
-	log.Println("Shutdown command received")
+	log.Printf("*** entered: handleShutdown\n")
 	resp := SvcStatus200{
 		Status:  "success",
 		Message: "Shutting down",
@@ -626,7 +626,7 @@ func handleShutdown(w http.ResponseWriter, r *http.Request, d *HInfo) {
 // handleGetActiveQueue handles the GetActiveQueue command
 // -----------------------------------------------------------------------------
 func handleGetActiveQueue(w http.ResponseWriter, r *http.Request, d *HInfo) {
-	log.Printf("dispatcher >>>> GetActiveQueue handler\n")
+	log.Printf("*** entered: handleGetActiveQueue\n")
 	items, err := app.qm.GetQueuedAndExecutingItems()
 	if err != nil {
 		SvcErrorReturn(w, fmt.Errorf("failed to get active queue items"))
@@ -648,7 +648,7 @@ func handleGetActiveQueue(w http.ResponseWriter, r *http.Request, d *HInfo) {
 // specified machine
 // -----------------------------------------------------------------------------
 func handleGetMachineQueue(w http.ResponseWriter, r *http.Request, d *HInfo) {
-	log.Printf("dispatcher >>>> GetMachineQueue handler\n")
+	log.Printf("*** entered: handleGetMachineQueue\n")
 	//-----------------------------------------------------------
 	// Unmarshal the command data into MachineQueueRequest
 	//-----------------------------------------------------------
@@ -677,7 +677,7 @@ func handleGetMachineQueue(w http.ResponseWriter, r *http.Request, d *HInfo) {
 // handleGetCompletedQueue handles the GetCompletedQueue command
 // -----------------------------------------------------------------------------
 func handleGetCompletedQueue(w http.ResponseWriter, r *http.Request, d *HInfo) {
-	log.Printf("dispatcher >>>> GetCompletedQueue handler\n")
+	log.Printf("*** entered: handleGetCompletedQueue\n")
 	items, err := app.qm.GetCompletedItems()
 	if err != nil {
 		SvcErrorReturn(w, fmt.Errorf("failed to get active queue items"))
@@ -698,7 +698,7 @@ func handleGetCompletedQueue(w http.ResponseWriter, r *http.Request, d *HInfo) {
 // handleUpdateItem handles the UpdateItem command
 // -----------------------------------------------------------------------------
 func handleUpdateItem(w http.ResponseWriter, r *http.Request, d *HInfo) {
-	log.Printf("dispatcher >>>> UpdateItem handler\n")
+	log.Printf("*** entered: handleUpdateItem\n")
 	z := string(rune(0x2026)) // the '...' character
 
 	//--------------------------------------------------------
@@ -791,7 +791,7 @@ func handleUpdateItem(w http.ResponseWriter, r *http.Request, d *HInfo) {
 // handleDeleteItem handles the DeleteItem command
 // -----------------------------------------------------------------------------
 func handleDeleteItem(w http.ResponseWriter, r *http.Request, d *HInfo) {
-	log.Printf("dispatcher >>>> DeleteItem handler\n")
+	log.Printf("*** entered: handleDeleteItem\n")
 	var req DeleteItemRequest
 	if err := json.Unmarshal(d.cmd.Data, &req); err != nil {
 		SvcErrorReturn(w, fmt.Errorf("invalid request data"))
@@ -808,13 +808,13 @@ func handleDeleteItem(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	// Delete the file and directory associated with the queue item
 	dirPath := filepath.Join(app.QdConfigsDir, fmt.Sprintf("%d", req.SID))
 	if err := os.RemoveAll(dirPath); err != nil {
-		LogAndErrorReturn(w, fmt.Errorf("failed to remove directory %s: %v", dirPath, err))
+		SvcErrorReturn(w, fmt.Errorf("failed to remove directory %s: %v", dirPath, err))
 		return
 	}
 
 	// Delete the queue item from the database
 	if err := app.qm.DeleteItem(req.SID); err != nil {
-		LogAndErrorReturn(w, fmt.Errorf("failed to delete queue item %d: %v", req.SID, err))
+		SvcErrorReturn(w, fmt.Errorf("failed to delete queue item %d: %v", req.SID, err))
 		return
 	}
 

@@ -87,6 +87,7 @@ func RebuildSimulatorList() error {
 	//------------------
 	// DEBUG
 	//------------------
+	log.Printf("SIMD: number of in-progress directories found in %s at startup: %d\n", app.simdHomeDir, len(dirs))
 	if len(dirs) > 0 {
 		log.Printf("SIMD: dispatcher reports %d simulations belonging to this machine\n", len(resp.Data))
 		s := "      SIDs = "
@@ -255,7 +256,7 @@ func recoverArchiveSimResults(qi *data.QueueItem) {
 }
 
 // recoverBookedSimulation - In this case, the simulation was booked but
-// we never go the simulator started.  Try to recover.
+// we never got the simulator started.  Try to recover.
 // -------------------------------------------------------------------------
 func recoverBookedSimulation(qi *data.QueueItem) {
 	log.Printf("simd >>>> RECOVER BOOKED SIMULATION - attempting to recover a booked simulation, sid = %d\n", qi.SID)
@@ -296,7 +297,7 @@ func recoverBookedSimulation(qi *data.QueueItem) {
 	//---------------------------------------------------
 	if len(configs) == 0 {
 		log.Printf("Simulation for SID: %d - Missing config file in directory: %s\n", qi.SID, sim.Directory)
-		log.Printf("Rebooking...\n")
+		log.Printf("Rebooking SID=%d...\n", qi.SID)
 		bookAndRunSimulation("Rebook", qi.SID)
 		return
 	}
@@ -338,6 +339,15 @@ func recoverBookedSimulation(qi *data.QueueItem) {
 func (sim *Simulation) recoverBasedOnFiles() (bool, error) {
 	filenames, err := getFilenamesInDir(sim.Directory)
 	if err != nil {
+		if strings.Contains(err.Error(), "no such file or directory") {
+			//------------------------------------------------------------------
+			// THE SIMULATION HAS BEEN BOOKED BY THIS COMPUTER, BUT WE DON'T
+			// HAVE THE DIRECTORY OR THE CONFIG FILE.  REBOOK IT...
+			//------------------------------------------------------------------
+			log.Printf("recoverBasedOnFiles: no simulation directory for SID=%d, rebooking ...\n", sim.SID)
+			bookAndRunSimulation("Rebook", sim.SID)
+			return true, nil
+		}
 		log.Printf("Simulation: %d - error occurred lookng for config file in %s: error: %v\n", sim.SID, sim.Directory, err)
 		return false, err
 	}

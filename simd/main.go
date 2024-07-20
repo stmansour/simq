@@ -58,24 +58,30 @@ var app struct {
 	HexASCIIDbg bool         // if true print reply buffers in hex and ASCII
 	HTTPHdrsDbg bool         // if true print HTTP headers
 	version     bool
+	simdHomeDir string // home directory - typically /usr/local/simq/simd
 }
 
 func readCommandLineArgs() {
 	flag.BoolVar(&app.HexASCIIDbg, "D", false, "Turn on debug mode")
 	flag.BoolVar(&app.version, "v", false, "Print the program version string")
+
+	fmt.Println("Command-line arguments:", os.Args)
+
 	flag.Parse()
 }
 
 func main() {
+	var err error
+
 	//-----------------------------------------
 	// OUTPUT MESSAGES TO A LOGFILE
 	//-----------------------------------------
-	exdir, err := util.GetExecutableDir()
+	app.simdHomeDir, err = util.GetExecutableDir()
 	if err != nil {
 		log.Fatalf("Failed to get executable directory: %v", err)
 	}
 
-	fname := filepath.Join(exdir, "simd.log")
+	fname := filepath.Join(app.simdHomeDir, "simd.log")
 	logFile, err := os.OpenFile(fname, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
 		log.Fatalf("Failed to open log file: %v", err)

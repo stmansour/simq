@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -29,6 +30,7 @@ func SvcWrite(w http.ResponseWriter, b []byte) {
 
 // SvcErrorReturn formats an error return to the grid widget and sends it
 func SvcErrorReturn(w http.ResponseWriter, err error) {
+	log.Printf("%v\n", err)
 	var e SvcStatus200
 	e.Status = "error"
 	e.Message = err.Error()
@@ -42,7 +44,7 @@ func SvcWriteResponse(w http.ResponseWriter, g interface{}) {
 	w.Header().Set("Content-Type", "application/json") // we're marshaling the data as json
 	b, err := json.Marshal(g)
 	if err != nil {
-		LogAndErrorReturn(w, fmt.Errorf("error marshaling json data: %s", err.Error()))
+		SvcErrorReturn(w, fmt.Errorf("error marshaling json data: %s", err.Error()))
 		return
 	}
 	SvcWrite(w, b)
