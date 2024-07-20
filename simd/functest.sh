@@ -41,22 +41,22 @@ cleanDirectories() {
 # INPUTS
 #    none yet
 #------------------------------------------------------------------------------
-startDispatcher() {
-    if ((DISPATCHER_RUNNING == 0)); then
-        killall -9 dispatcher >/dev/null 2>&1
+# startDispatcher() {
+#     if ((DISPATCHER_RUNNING == 0)); then
+#         killall -9 dispatcher >/dev/null 2>&1
 
-        #-------------------------------------------------------
-        # start a new dispatcher with a clean database table
-        #-------------------------------------------------------
-        echo "DROP TABLE IF EXISTS Queue;" | ${MYSQL} simqtest
-        rm -rf qdconfigs
+#         #-------------------------------------------------------
+#         # start a new dispatcher with a clean database table
+#         #-------------------------------------------------------
+#         echo "DROP TABLE IF EXISTS Queue;" | ${MYSQL} simqtest
+#         rm -rf qdconfigs
 
-        ./dispatcher >DISPATCHER.log 2>&1 &
-        DISPATCHER_PID=$!
-        sleep 2
-        DISPATCHER_RUNNING=1
-    fi
-}
+#         ./dispatcher >DISPATCHER.log 2>&1 &
+#         DISPATCHER_PID=$!
+#         sleep 2
+#         DISPATCHER_RUNNING=1
+#     fi
+# }
 
 #------------------------------------------------------------------------------
 # checkFileExists - wait, for up to 10 seconds, for a file to 
@@ -72,7 +72,7 @@ checkFileExists() {
 
     echo "checkFileExists looking for: ${file}"
 
-    while [ $seconds -lt $timeout ]; do
+    while (( seconds < timeout )); do
         if [ -f "$file" ]; then
             echo "File $file found after $seconds seconds."
             return 0
@@ -92,6 +92,23 @@ startSimd() {
     ./simd &
     SIMD_PID=$!
     echo "simd started, SIMD_PID = ${SIMD_PID}"
+}
+
+#------------------------------------------------------------------------------
+#  startDispatcher - kill any existing dispatcher, then start the dispatcher.
+#------------------------------------------------------------------------------
+startDispatcher() {
+    killall dispatcher >/dev/null
+    CWD=$(pwd)
+    cd ../dispatcher || exit 2
+    ./dispatcher &
+    DISPATCHER_PID=$(pgrep dispatcher)
+    cd "${CWD}" || exit 2
+    echo "dispatcher started, DISPATCHER_PID = ${DISPATCHER_PID}"
+}
+
+shutdownDispatcher() {
+    kill -9 "${DISPATCHER_PID}"
 }
 
 #------------------------------------------------------------------------------
@@ -164,7 +181,7 @@ while getopts "acd:t:" o; do
     echo "o = ${o}"
     case "${o}" in
     a)
-        ASKBEFOREEXIT=1
+        # ASKBEFOREEXIT=1
         echo "WILL ASK BEFORE EXITING ON ERROR"
         ;;
 
@@ -196,13 +213,16 @@ done
 shift $((OPTIND - 1))
 ############################################################################################
 
+startDispatcher
+sleep 1
+
 #------------------------------------------------------------------------------
 #  TEST a
 #  initial dispatcher test - a simulation was booked, but no simulation
 #  directory exists
 #------------------------------------------------------------------------------
 TFILES="a"
-STEP=0
+# STEP=0
 if [[ "${SINGLETEST}${TFILES}" = "${TFILES}" || "${SINGLETEST}${TFILES}" = "${TFILES}${TFILES}" ]]; then
     echo "test ${TFILES} - individual test recover booked simulation, no simulation directory"
     loadDataset 1
@@ -218,7 +238,7 @@ fi
 #  TEST b
 #------------------------------------------------------------------------------
 TFILES="b"
-STEP=0
+# STEP=0
 if [[ "${SINGLETEST}${TFILES}" = "${TFILES}" || "${SINGLETEST}${TFILES}" = "${TFILES}${TFILES}" ]]; then
     echo "test ${TFILES} - test recover booked simulation, simulation directory exists, but no config file"
     loadDataset 2
@@ -234,7 +254,7 @@ fi
 #  TEST c
 #------------------------------------------------------------------------------
 TFILES="c"
-STEP=0
+# STEP=0
 if [[ "${SINGLETEST}${TFILES}" = "${TFILES}" || "${SINGLETEST}${TFILES}" = "${TFILES}${TFILES}" ]]; then
     echo "test ${TFILES} - test recover booked simulation, simulation directory exists, config file exists"
     loadDataset 3
@@ -250,7 +270,7 @@ fi
 #  TEST d
 #------------------------------------------------------------------------------
 TFILES="d"
-STEP=0
+# STEP=0
 if [[ "${SINGLETEST}${TFILES}" = "${TFILES}" || "${SINGLETEST}${TFILES}" = "${TFILES}${TFILES}" ]]; then
     echo "test ${TFILES} - test recover booked simulation, simulation directory exists, results completed"
     loadDataset 4
@@ -266,7 +286,7 @@ fi
 #  TEST e
 #------------------------------------------------------------------------------
 TFILES="e"
-STEP=0
+# STEP=0
 if [[ "${SINGLETEST}${TFILES}" = "${TFILES}" || "${SINGLETEST}${TFILES}" = "${TFILES}${TFILES}" ]]; then
     echo "test ${TFILES} - test recover booked simulation, simulation directory exists, results.tar.gz exists."
     loadDataset 5
@@ -282,21 +302,24 @@ fi
 #  TEST f
 #------------------------------------------------------------------------------
 TFILES="f"
-STEP=0
+# STEP=0
 if [[ "${SINGLETEST}${TFILES}" = "${TFILES}" || "${SINGLETEST}${TFILES}" = "${TFILES}${TFILES}" ]]; then
     echo "test ${TFILES} - test recover booked simulation, and it has a running simulator working on it."
     loadDataset 6
     TARGETFILE="${RESULTSDIR}/${YEAR}/${MONTH}/${DAY}/6/finrep.csv"
     killall simulator
     CWD=$(pwd)
-    cd /var/lib/simd/simulations/6; /usr/local/plato/bin/simulator -c med.json5 -SID 6 -DISPATCHER http://localhost:8250/ >sim.log 2>&1 &
-    cd "${CWD}"
+    cd /var/lib/simd/simulations/6 || exit 2; /usr/local/plato/bin/simulator -c med.json5 -SID 6 -DISPATCHER http://localhost:8250/ >sim.log 2>&1 &
+    cd "${CWD}" || exit 2
     startSimd
     TIMELIMIT=120
     usefulCommands
     echo "Waiting for the creation of: ${TARGETFILE}"
     delayForSimulatorCheck
 fi
+
+shutdownDispatcher
+sleep 1
 
 echo "------------------------------------------------------------------"
 ShowDuration

@@ -212,7 +212,7 @@ func monitorSimulator(sim *Simulation) {
 	// Create a ticker that triggers every 5 minutes
 	//-------------------------------------------------------------
 	//ticker := time.NewTicker(5 * time.Minute)
-	ticker := time.NewTicker(30 * time.Second) // DEBUG: 30 seconds  (for testing. Make it longer later)
+	ticker := time.NewTicker(15 * time.Second) // DEBUG: 15 seconds  (for testing. Make it longer later)
 	defer ticker.Stop()
 
 	//-------------------------------------------------------------

@@ -18,6 +18,8 @@ clean:
 	@echo "*** ${THISDIR}: completed clean ***"
 
 test: config
+	@touch $(TEST_FAILURE_FILE)
+	@./functest.sh && rm -f $(TEST_FAILURE_FILE) 
 	@echo "*** ${THISDIR}: completed test ***"
 
 config:
