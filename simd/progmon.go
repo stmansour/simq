@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -271,10 +272,16 @@ func (sim *Simulation) isSimulatorRunning() bool {
 	return true
 }
 
+// we're going to mutex lock this function
+var mutex sync.Mutex
+
 // archiveSimulationResults adds all the files we care in the simulation directory
 // to a tar.gz file
 // -----------------------------------------------------------------------------------
 func (sim *Simulation) archiveSimulationResults() error {
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	log.Printf("archiveSimulationResults: SID = %d, directory = %s\n", sim.SID, sim.Directory)
 
 	//------------------------------------
@@ -290,7 +297,7 @@ func (sim *Simulation) archiveSimulationResults() error {
 	//------------------------------------
 	err = os.Chdir(sim.Directory)
 	if err != nil {
-		return fmt.Errorf("archiveSimulationResults: SID=%d, failed to change to simulation directory: %w", sim.SID, err)
+		return fmt.Errorf("archiveSimulationResults: SID=%d, failed to change to simulation directory %s: %w", sim.SID, sim.Directory, err)
 	}
 
 	//------------------------------------------------------------------

@@ -42,10 +42,17 @@ nohup ./simd &
 cat <<EOF
 HANDY COMMANDS
 ==============
-cd /usr/local/simq/dispatcher ; logmon disp
-cd /usr/local/simq/simd ; logmon simd
-tree /var/lib/dispatcher/qdconfigs
-tree /var/lib/simd/simulations
-tree /genome/simres/2024/
+    cd /usr/local/simq/dispatcher ; logmon disp
+    cd /usr/local/simq/simd ; logmon simd
+    tree /var/lib/dispatcher/qdconfigs
+    tree /var/lib/simd/simulations
+    tree /genome/simres/2024/
 EOF
 
+HOSTNAME=$(hostname)
+if [ "${HOSTNAME}" = "plato" ]; then
+cat <<EOF2
+    logmon disp
+    logmon simd
+EOF2
+fi
