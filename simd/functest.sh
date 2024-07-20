@@ -199,3 +199,75 @@ if [[ "${SINGLETEST}${TFILES}" = "${TFILES}" || "${SINGLETEST}${TFILES}" = "${TF
     
     kill $SIMD_PID >/dev/null 2>&1
 fi
+
+#------------------------------------------------------------------------------
+#  TEST c
+#------------------------------------------------------------------------------
+TFILES="c"
+STEP=0
+if [[ "${SINGLETEST}${TFILES}" = "${TFILES}" || "${SINGLETEST}${TFILES}" = "${TFILES}${TFILES}" ]]; then
+    echo "test ${TFILES} - test recover booked simulation, simulation directory exists, config file exists"
+    cleanDirectories
+    loadDataset 3
+
+    TARGETFILE="${RESULTSDIR}/${YEAR}/${MONTH}/${DAY}/3/finrep.csv"
+    echo "Waiting for the creation of: ${TARGETFILE}"
+    startSimd
+    TIMELIMIT=20
+    usefulCommands
+    if checkFileExists "${TARGETFILE}" "${TIMELIMIT}"; then
+        echo "PASS"
+    else
+        echo "FAIL... ${TARGETFILE} was not present after ${TIMELIMIT} sec"
+    fi
+    
+    kill $SIMD_PID >/dev/null 2>&1
+fi
+
+#------------------------------------------------------------------------------
+#  TEST d
+#------------------------------------------------------------------------------
+TFILES="d"
+STEP=0
+if [[ "${SINGLETEST}${TFILES}" = "${TFILES}" || "${SINGLETEST}${TFILES}" = "${TFILES}${TFILES}" ]]; then
+    echo "test ${TFILES} - test recover booked simulation, simulation directory exists, results completed"
+    cleanDirectories
+    loadDataset 4
+
+    TARGETFILE="${RESULTSDIR}/${YEAR}/${MONTH}/${DAY}/4/finrep.csv"
+    echo "Waiting for the creation of: ${TARGETFILE}"
+    startSimd
+    TIMELIMIT=20
+    usefulCommands
+    if checkFileExists "${TARGETFILE}" "${TIMELIMIT}"; then
+        echo "PASS"
+    else
+        echo "FAIL... ${TARGETFILE} was not present after ${TIMELIMIT} sec"
+    fi
+    
+    kill $SIMD_PID >/dev/null 2>&1
+fi
+
+#------------------------------------------------------------------------------
+#  TEST e
+#------------------------------------------------------------------------------
+TFILES="e"
+STEP=0
+if [[ "${SINGLETEST}${TFILES}" = "${TFILES}" || "${SINGLETEST}${TFILES}" = "${TFILES}${TFILES}" ]]; then
+    echo "test ${TFILES} - test recover booked simulation, simulation directory exists, results.tar.gz exists"
+    cleanDirectories
+    loadDataset 5
+
+    TARGETFILE="${RESULTSDIR}/${YEAR}/${MONTH}/${DAY}/5/finrep.csv"
+    echo "Waiting for the creation of: ${TARGETFILE}"
+    startSimd
+    TIMELIMIT=20
+    usefulCommands
+    if checkFileExists "${TARGETFILE}" "${TIMELIMIT}"; then
+        echo "PASS"
+    else
+        echo "FAIL... ${TARGETFILE} was not present after ${TIMELIMIT} sec"
+    fi
+    
+    kill $SIMD_PID >/dev/null 2>&1
+fi
