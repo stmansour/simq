@@ -14,6 +14,17 @@ MONTH=$(date +"%-m")
 DAY=$(date +"%-d")
 TESTCOUNT=0
 ERRORCOUNT=0
+START_TIME=$(date +%s)
+
+ShowDuration() {
+    END_TIME=$(date +%s)
+    echo "End time: ${END_TIME}"
+    ELAPSED_TIME=$((END_TIME - START_TIME))
+    HOURS=$((ELAPSED_TIME / 3600))
+    MINUTES=$(((ELAPSED_TIME % 3600) / 60))
+    SECONDS=$((ELAPSED_TIME % 60))
+    echo "Elapsed time: ${HOURS}h ${MINUTES}m ${SECONDS}s"
+}
 
 #--------------------------------------------------------------------------------------
 # cleanDirectories removes all data files maintained by simd and dispatcher,
@@ -288,6 +299,7 @@ if [[ "${SINGLETEST}${TFILES}" = "${TFILES}" || "${SINGLETEST}${TFILES}" = "${TF
 fi
 
 echo "------------------------------------------------------------------"
+ShowDuration
 echo "Total tests: ${TESTCOUNT}"
 echo "Total errors: ${ERRORCOUNT}"
 if [ "${ERRORCOUNT}" -gt 0 ]; then
