@@ -678,7 +678,7 @@ func handleDeleteItem(w http.ResponseWriter, r *http.Request, d *HInfo) {
 
 	// Delete the file and directory associated with the queue item
 	dirPath := filepath.Join(app.QdConfigsDir, fmt.Sprintf("%d", req.SID))
-	if err := os.RemoveAll(dirPath); err != nil {
+	if err := threadSafeRemoveAll(dirPath); err != nil {
 		SvcErrorReturn(w, fmt.Errorf("failed to remove directory %s: %v", dirPath, err))
 		return
 	}
