@@ -262,8 +262,8 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	//---------------------------------------------------------------
 	configDir := filepath.Join(app.QdConfigsDir, fmt.Sprintf("%d", queueItem.SID))
 	log.Printf("handleEndSimulation: removing config directory %s\n", configDir)
-	if err := os.RemoveAll(configDir); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: error in RemoveAll: %v", err))
+	if err := threadSafeRemoveAll(configDir); err != nil {
+		SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: error in removing %s: %v", configDir, err))
 		return
 	}
 	log.Printf("handleEndSimulation: sucussfully removed %s\n", configDir)
@@ -450,37 +450,6 @@ func handleNewSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	}
 
 	//----------------------------------------------
-	// Create the directory if it doesn't exist
-	//----------------------------------------------
-	err = os.MkdirAll(app.QdConfigsDir, os.ModePerm)
-	if err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleNewSimulation: failed to create directory: %v", err))
-		return
-	}
-
-	//----------------------------------------------
-	// Create a new file in the qdconfigs directory
-	//----------------------------------------------
-	tempFile, err := os.CreateTemp(app.QdConfigsDir, "config-*.json5")
-	if err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleNewSimulation: failed to create temp file in directory %s: %v", app.QdConfigsDir, err))
-		return
-	}
-	defer tempFile.Close()
-	if len(fileContent) == 0 {
-		SvcErrorReturn(w, fmt.Errorf("handleNewSimulation: no file content. 0-length file"))
-		return
-	}
-
-	//----------------------------------------------
-	// Write the file content to a TEMPORARY file
-	//----------------------------------------------
-	if _, err := tempFile.Write(fileContent); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleNewSimulation: failed to write file content: %v", err))
-		return
-	}
-
-	//----------------------------------------------
 	// Insert the queue item
 	//----------------------------------------------
 	queueItem := data.QueueItem{
@@ -492,31 +461,12 @@ func handleNewSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 		URL:         req.URL,
 		State:       data.StateQueued,
 	}
-	sid, err := app.qm.InsertItem(queueItem)
-	if err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleNewSimulation: failed to insert new item to database: %v", err))
+
+	var sid int64
+	if sid, err = threadSafeNewSim(fileContent, &queueItem, &req); err != nil {
+		SvcErrorReturn(w, fmt.Errorf("handleNewSimulation: %s", err.Error()))
 		return
 	}
-
-	//----------------------------------------------
-	// Make the new directory
-	//----------------------------------------------
-	fpath := filepath.Join(app.QdConfigsDir, fmt.Sprintf("%d", sid))
-	err = os.MkdirAll(fpath, os.ModePerm)
-	if err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleNewSimulation: failed to make directory %s: %v", fpath, err))
-		return
-	}
-
-	//---------------------------------------------------------------------
-	// Rename the file to include the queue item ID and original filename
-	//---------------------------------------------------------------------
-	newFilePath := filepath.Join(app.QdConfigsDir, fmt.Sprintf("%d", sid), req.OriginalFilename)
-	if err := os.Rename(tempFile.Name(), newFilePath); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleNewSimulation: failed to rename %s to %s: %v", tempFile.Name(), newFilePath, err))
-		return
-	}
-
 	//--------------------
 	// Send back SUCCESS
 	//--------------------

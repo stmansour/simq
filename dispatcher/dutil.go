@@ -10,6 +10,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"time"
+
+	"github.com/stmansour/simq/data"
 )
 
 // SvcStatus200 is a simple status message return
@@ -161,4 +163,70 @@ func executeTarCommand() error {
 	tcmd.Stdout = os.Stdout
 	tcmd.Stderr = os.Stderr
 	return tcmd.Run()
+}
+
+func threadSafeRemoveAll(configDir string) error {
+	app.mutex.Lock() // Lock the mutex before modifying app.sims
+	defer app.mutex.Unlock()
+	if err := os.RemoveAll(configDir); err != nil {
+		return fmt.Errorf("error in os.RemoveAll: %v", err)
+	}
+	return nil
+}
+
+func threadSafeNewSim(fileContent []byte, queueItem *data.QueueItem, req *CreateQueueEntryRequest) (int64, error) {
+	app.mutex.Lock() // Lock the mutex before modifying app.sims
+	defer app.mutex.Unlock()
+	var err error
+
+	//----------------------------------------------
+	// Create the directory if it doesn't exist
+	//----------------------------------------------
+	err = os.MkdirAll(app.QdConfigsDir, os.ModePerm)
+	if err != nil {
+		return 0, fmt.Errorf("handleNewSimulation: failed to create directory: %v", err)
+	}
+
+	//----------------------------------------------
+	// Create a new file in the qdconfigs directory
+	//----------------------------------------------
+	tempFile, err := os.CreateTemp(app.QdConfigsDir, "config-*.json5")
+	if err != nil {
+		return 0, fmt.Errorf("handleNewSimulation: failed to create temp file in directory %s: %v", app.QdConfigsDir, err)
+	}
+	defer tempFile.Close()
+	if len(fileContent) == 0 {
+		return 0, fmt.Errorf("handleNewSimulation: no file content. 0-length file")
+	}
+
+	//----------------------------------------------
+	// Write the file content to a TEMPORARY file
+	//----------------------------------------------
+	if _, err := tempFile.Write(fileContent); err != nil {
+		return 0, fmt.Errorf("handleNewSimulation: failed to write file content: %v", err)
+	}
+
+	sid, err := app.qm.InsertItem(*queueItem)
+	if err != nil {
+		return 0, fmt.Errorf("handleNewSimulation: failed to insert new item to database: %v", err)
+	}
+
+	//----------------------------------------------
+	// Make the new directory
+	//----------------------------------------------
+	fpath := filepath.Join(app.QdConfigsDir, fmt.Sprintf("%d", sid))
+	err = os.MkdirAll(fpath, os.ModePerm)
+	if err != nil {
+		return 0, fmt.Errorf("handleNewSimulation: failed to make directory %s: %v", fpath, err)
+	}
+
+	//---------------------------------------------------------------------
+	// Rename the file to include the queue item ID and original filename
+	//---------------------------------------------------------------------
+	newFilePath := filepath.Join(app.QdConfigsDir, fmt.Sprintf("%d", sid), req.OriginalFilename)
+	if err := os.Rename(tempFile.Name(), newFilePath); err != nil {
+		return 0, fmt.Errorf("handleNewSimulation: failed to rename %s to %s: %v", tempFile.Name(), newFilePath, err)
+	}
+
+	return sid, nil
 }
