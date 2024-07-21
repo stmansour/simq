@@ -1,0 +1,25 @@
+PLATO Dispatcher
+
+How To Use The Service On Linux
+
+To check its status:
+    sudo systemctl status plato.dispatcher.service
+
+To start it manually:
+    sudo systemctl start plato.dispatcher.service
+
+To stop it manually:
+    sudo systemctl stop plato.dispatcher.service
+
+To restart it manually:
+    sudo systemctl restart plato.dispatcher.service
+
+To ensure the service starts automatically at boot:
+    sudo systemctl enable plato.dispatcher.service
+
+To disable the service from starting at boot:
+    sudo systemctl disable plato.dispatcher.service
+
+To view the logs for this service:
+    journalctl -u plato.dispatcher.service
+

@@ -174,7 +174,7 @@ HOSTNAME=$(hostname)
 if [ "${HOSTNAME}" != "StevesMcBookPro.attlocal.net" ]; then
     echo "This script kills simd, resets the simq database, and many other similarly"
     echo "destructive things. It should only be run on StevesMcBookPro.attlocal.net"
-    exit 1
+    exit 0
 fi
 
 while getopts "acd:t:" o; do

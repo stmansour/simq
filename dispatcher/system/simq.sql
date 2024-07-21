@@ -1,6 +1,6 @@
 -- MySQL dump 10.13  Distrib 8.0.30, for macos12 (arm64)
 --
--- Host: localhost    Database: simq
+-- Host: localhost    Database: simqtest
 -- ------------------------------------------------------
 -- Server version	8.0.30
 
@@ -37,7 +37,7 @@ CREATE TABLE `Queue` (
   `Created` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `Modified` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`SID`)
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=20 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -46,7 +46,7 @@ CREATE TABLE `Queue` (
 
 LOCK TABLES `Queue` WRITE;
 /*!40000 ALTER TABLE `Queue` DISABLE KEYS */;
-INSERT INTO `Queue` VALUES (1,'fast.json5','testguy','Test 1',5,'Recovery Test Case 1','7cf2ec5736624ae680e87e3587c5faec',' ',1,NULL,NULL,'2024-07-17 23:47:26','2024-07-18 00:11:33'),(2,'fast.json5','testguy','Test 2',5,'Recovery Test Case 2','7cf2ec5736624ae680e87e3587c5faec',' ',1,NULL,NULL,'2024-07-17 23:47:26','2024-07-18 00:11:33'),(3,'med.json5','testguy','Test 3',5,'Recovery: attach to running simulator','7cf2ec5736624ae680e87e3587c5faec',' ',2,NULL,NULL,'2024-07-18 02:02:21','2024-07-18 02:07:48');
+INSERT INTO `Queue` VALUES (1,'fast.json5','testguy','Test 1',5,'Recovery Test Case 1','7cf2ec5736624ae680e87e3587c5faec',' ',1,NULL,NULL,'2024-07-17 23:47:26','2024-07-18 00:11:33'),(2,'fast.json5','testguy','Test 2',5,'Recovery Test Case 2','7cf2ec5736624ae680e87e3587c5faec',' ',1,NULL,NULL,'2024-07-17 23:47:26','2024-07-18 00:11:33'),(3,'med.json5','testguy','Test 3',5,'Recovery: attach to running simulator','7cf2ec5736624ae680e87e3587c5faec',' ',2,NULL,NULL,'2024-07-18 02:02:21','2024-07-18 02:07:48'),(4,'fast.json5','testguy','Test 4',5,'Thread-safety checking','7cf2ec5736624ae680e87e3587c5faec',' ',1,NULL,NULL,'2024-07-18 22:29:46','2024-07-18 22:29:46'),(5,'fast.json5','testguy','Test 5',5,'Thread-safety checking','7cf2ec5736624ae680e87e3587c5faec',' ',1,NULL,NULL,'2024-07-18 22:29:46','2024-07-18 22:29:46'),(6,'fast.json5','testguy','Test 5',5,'Thread-safety checking','7cf2ec5736624ae680e87e3587c5faec',' ',1,NULL,NULL,'2024-07-18 22:29:46','2024-07-18 22:29:46'),(7,'fast.json5','testguy','Test 5',5,'Thread-safety checking','7cf2ec5736624ae680e87e3587c5faec',' ',1,NULL,NULL,'2024-07-18 22:29:46','2024-07-18 22:29:46'),(8,'fast.json5','testguy','Test 5',5,'Thread-safety checking','7cf2ec5736624ae680e87e3587c5faec',' ',1,NULL,NULL,'2024-07-18 22:29:46','2024-07-18 22:29:46'),(9,'fast.json5','testguy','Test 5',5,'Thread-safety checking','7cf2ec5736624ae680e87e3587c5faec',' ',1,NULL,NULL,'2024-07-18 22:29:46','2024-07-18 22:29:46'),(10,'fast.json5','testguy','Test 5',5,'Thread-safety checking','7cf2ec5736624ae680e87e3587c5faec',' ',1,NULL,NULL,'2024-07-18 22:29:46','2024-07-18 22:29:46'),(11,'fast.json5','testguy','Test 5',5,'Thread-safety checking','7cf2ec5736624ae680e87e3587c5faec','',1,NULL,NULL,'2024-07-21 20:02:24','2024-07-21 20:07:40'),(12,'fast.json5','testguy','Test 5',5,'Thread-safety checking','7cf2ec5736624ae680e87e3587c5faec','',1,NULL,NULL,'2024-07-21 20:02:24','2024-07-21 20:07:40'),(13,'fast.json5','testguy','Test 5',5,'Thread-safety checking','7cf2ec5736624ae680e87e3587c5faec','',1,NULL,NULL,'2024-07-21 20:02:24','2024-07-21 20:07:40'),(14,'fast.json5','testguy','Test 5',5,'Thread-safety checking','7cf2ec5736624ae680e87e3587c5faec','',1,NULL,NULL,'2024-07-21 20:02:24','2024-07-21 20:07:40'),(15,'fast.json5','testguy','Test 5',5,'Thread-safety checking','7cf2ec5736624ae680e87e3587c5faec','',1,NULL,NULL,'2024-07-21 20:02:24','2024-07-21 20:07:40'),(16,'fast.json5','testguy','Test 5',5,'Thread-safety checking','7cf2ec5736624ae680e87e3587c5faec','',1,NULL,NULL,'2024-07-21 20:02:24','2024-07-21 20:07:40'),(17,'fast.json5','testguy','Test 5',5,'Thread-safety checking','7cf2ec5736624ae680e87e3587c5faec','',1,NULL,NULL,'2024-07-21 20:02:24','2024-07-21 20:07:40'),(18,'fast.json5','testguy','Test 5',5,'Thread-safety checking','7cf2ec5736624ae680e87e3587c5faec','',1,NULL,NULL,'2024-07-21 20:02:24','2024-07-21 20:07:40'),(19,'fast.json5','testguy','Test 5',5,'Thread-safety checking','7cf2ec5736624ae680e87e3587c5faec','',1,NULL,NULL,'2024-07-21 20:02:24','2024-07-21 20:07:40');
 /*!40000 ALTER TABLE `Queue` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -59,4 +59,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2024-07-17 19:08:07
+-- Dump completed on 2024-07-21 13:09:36

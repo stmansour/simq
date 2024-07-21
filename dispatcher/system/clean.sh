@@ -26,8 +26,8 @@ EOF
 #---------------------------------------
 # RESET GENOME    (SIMULATION REPOSITORY)
 #---------------------------------------
-echo "resetting /genome/simres/2024/7/*"
-rm -rf /genome/simres/2024/7/*
+echo "resetting /genome/simres/"
+rm -rf /genome/simres/*
 
 #---------------------------------------
 # REMOVE DISPATCHER LOGS & TEMP STORAGE

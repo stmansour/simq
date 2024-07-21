@@ -98,7 +98,8 @@ func main() {
 	//-------------------------------------
 	// READ CONFIG
 	//-------------------------------------
-	if err = loadConfig("simdconf.json5", &app.cfg); err != nil {
+	fname = filepath.Join(app.simdHomeDir, "simdconf.json5")
+	if err = loadConfig(fname, &app.cfg); err != nil {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
 
