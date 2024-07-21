@@ -57,8 +57,9 @@ var app struct {
 	simsMu      sync.Mutex   // mutex for updating sims
 	HexASCIIDbg bool         // if true print reply buffers in hex and ASCII
 	HTTPHdrsDbg bool         // if true print HTTP headers
-	version     bool
-	simdHomeDir string // home directory - typically /usr/local/simq/simd
+	version     bool         // program version string
+	simdHomeDir string       // home directory - typically /usr/local/simq/simd
+	mutex       sync.Mutex   // mutex for creating the tar.gz file
 }
 
 func readCommandLineArgs() {

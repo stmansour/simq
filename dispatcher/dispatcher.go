@@ -10,7 +10,6 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -230,93 +229,11 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	)
 	filename := filepath.Join(dirPath, cmd.Filename)
 
-	//--------------------------------------------------
-	// CREATE THE FULL PATH
-	//--------------------------------------------------
-	if err := os.MkdirAll(dirPath, os.ModePerm); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: error from os.MkdirAll(%s): %s", dirPath, err.Error()))
-		return
-	}
-
-	//----------------------------------------------------
-	// EXTRACT THE FILE CONTENT
-	//----------------------------------------------------
-	file, _, err := r.FormFile("file")
-	if err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to get file from form"))
-		return
-	}
-	defer file.Close()
-	fileContent, err := io.ReadAll(file)
-	if err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to read file content"))
-		return
-	}
-
-	//----------------------------------------------
-	// CREATE THE TAR.GZ FILE
-	//----------------------------------------------
-	tarz, err := os.Create(filename)
-	if err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to create file %s: %v", filename, err))
-		return
-	}
-	defer tarz.Close()
-	if len(fileContent) == 0 {
-		SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: no file content. 0-length file"))
-		return
-	}
-
-	//----------------------------------------------
-	// WRITE THE TAR.GZ FILE
-	//----------------------------------------------
-	if _, err := tarz.Write(fileContent); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to write to file %s: %v", filename, err))
-		return
-	}
-
-	//----------------------------------------------
-	// EXTRACT THE FILES FROM THE TAR.GZ FILE
-	//----------------------------------------------
-	originalDir, err := os.Getwd() // Save the current directory
-	if err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to get current directory: %v", err))
-		return
-	}
-	err = os.Chdir(dirPath) // Change to the target directory
-	if err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to change directory to %s: %v", dirPath, err))
-		return
-	}
-
-	//----------------------------------------------------------------------
-	// tar has actually failed here.  We'll implement retry logic...
-	//----------------------------------------------------------------------
-	const maxRetries = 3
-	const retryDelay = 2 * time.Second
-	for i := 0; i < maxRetries; i++ {
-		err = executeTarCommand()
-		if err == nil {
-			break
-		}
-		log.Printf("handleEndSimulation: failed to execute tar command (attempt %d/%d): %v", i+1, maxRetries, err)
-		time.Sleep(retryDelay)
-	}
-	if err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to execute tar command after %d attempts: %v", maxRetries, err))
-		return
-	}
-
-	err = os.Chdir(originalDir) // Return back to the original directory
-	if err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to change back to the original directory: %v", err))
-	}
-
-	//---------------------------------------------------------------------------------------
-	// After we have extracted the data files, we no longer need the tar.gz file. Delete it.
-	//---------------------------------------------------------------------------------------
-	if err := os.Remove(filename); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: failed to remove config file"))
+	//--------------------------------------------------------
+	// DO ALL THE FILE I/O IN A THREAD-SAFE FUNCTION...
+	//--------------------------------------------------------
+	if err := threadSafeFileIOEndSim(dirPath, filename, r); err != nil {
+		SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: error from threadSafeFileIOForBook: %s", err.Error()))
 		return
 	}
 
@@ -364,13 +281,6 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	}
 	SvcWriteResponse(w, &resp)
 	log.Printf("*** handleEndSimulation:  SUCCESSFUL ***\n")
-}
-
-func executeTarCommand() error {
-	tcmd := exec.Command("tar", "xzf", "results.tar.gz")
-	tcmd.Stdout = os.Stdout
-	tcmd.Stderr = os.Stderr
-	return tcmd.Run()
 }
 
 // handleBook handles the Book command

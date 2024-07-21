@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/stmansour/simq/data"
@@ -28,6 +29,7 @@ var app struct {
 	HTTPHdrsDbg   bool // if true print HTTP headers
 	SimResultsDir string
 	QdConfigsDir  string
+	mutex         sync.Mutex
 }
 
 func readCommandLineArgs() {

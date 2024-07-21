@@ -3,10 +3,13 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"time"
 )
 
 // SvcStatus200 is a simple status message return
@@ -63,4 +66,99 @@ func findConfigFile(configDir string) (string, error) {
 	}
 
 	return "", fmt.Errorf("no config file found in the directory")
+}
+
+func threadSafeFileIOEndSim(dirPath, filename string, r *http.Request) error {
+	//--------------------------------------------------
+	// CREATE THE FULL PATH
+	//--------------------------------------------------
+	app.mutex.Lock() // Lock the mutex before modifying app.sims
+	defer app.mutex.Unlock()
+
+	if err := os.MkdirAll(dirPath, os.ModePerm); err != nil {
+		app.mutex.Unlock() // Unlock the mutex after modification
+		return fmt.Errorf("handleEndSimulation: error from os.MkdirAll(%s): %s", dirPath, err.Error())
+	}
+
+	//----------------------------------------------------
+	// EXTRACT THE FILE CONTENT
+	//----------------------------------------------------
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		return fmt.Errorf("handleEndSimulation: failed to get file from form")
+	}
+	defer file.Close()
+	fileContent, err := io.ReadAll(file)
+	if err != nil {
+		return fmt.Errorf("handleEndSimulation: failed to read file content")
+	}
+
+	//----------------------------------------------
+	// CREATE THE TAR.GZ FILE
+	//----------------------------------------------
+	tarz, err := os.Create(filename)
+	if err != nil {
+		return fmt.Errorf("handleEndSimulation: failed to create file %s: %v", filename, err)
+	}
+	defer tarz.Close()
+	if len(fileContent) == 0 {
+		return fmt.Errorf("handleEndSimulation: no file content. 0-length file")
+	}
+
+	//----------------------------------------------
+	// WRITE THE TAR.GZ FILE
+	//----------------------------------------------
+	if _, err := tarz.Write(fileContent); err != nil {
+		return fmt.Errorf("handleEndSimulation: failed to write to file %s: %v", filename, err)
+	}
+
+	//----------------------------------------------
+	// EXTRACT THE FILES FROM THE TAR.GZ FILE
+	//----------------------------------------------
+	originalDir, err := os.Getwd() // Save the current directory
+	if err != nil {
+		return fmt.Errorf("handleEndSimulation: failed to get current directory: %v", err)
+	}
+	err = os.Chdir(dirPath) // Change to the target directory
+	if err != nil {
+		return fmt.Errorf("handleEndSimulation: failed to change directory to %s: %v", dirPath, err)
+	}
+
+	//----------------------------------------------------------------------
+	// tar has actually failed here.  We'll implement retry logic...
+	//----------------------------------------------------------------------
+	const maxRetries = 3
+	const retryDelay = 2 * time.Second
+	for i := 0; i < maxRetries; i++ {
+		err = executeTarCommand()
+		if err == nil {
+			break
+		}
+		log.Printf("handleEndSimulation: failed to execute tar command (attempt %d/%d): %v", i+1, maxRetries, err)
+		time.Sleep(retryDelay)
+	}
+	if err != nil {
+		return fmt.Errorf("handleEndSimulation: failed to execute tar command after %d attempts: %v", maxRetries, err)
+	}
+
+	err = os.Chdir(originalDir) // Return back to the original directory
+	if err != nil {
+		return fmt.Errorf("handleEndSimulation: failed to change back to the original directory: %v", err)
+	}
+
+	//---------------------------------------------------------------------------------------
+	// After we have extracted the data files, we no longer need the tar.gz file. Delete it.
+	//---------------------------------------------------------------------------------------
+	if err := os.Remove(filename); err != nil {
+		return fmt.Errorf("handleEndSimulation: failed to remove config file")
+	}
+
+	return nil
+}
+
+func executeTarCommand() error {
+	tcmd := exec.Command("tar", "xzf", "results.tar.gz")
+	tcmd.Stdout = os.Stdout
+	tcmd.Stderr = os.Stderr
+	return tcmd.Run()
 }
