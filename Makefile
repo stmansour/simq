@@ -64,6 +64,9 @@ package:
 	./mkdist.sh
 	# cd dist ; rm -f simq.tar* ; tar cvf simq.tar simq ; gzip simq.tar
 
+post:
+	cp dist/*.gz /var/www/html/downloads/
+
 all: starttimer clean doit package test stoptimer
 	@echo "Completed"
 
