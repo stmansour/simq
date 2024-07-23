@@ -37,6 +37,7 @@ var app struct {
 	DispatcherURL  string
 	DispatcherHost string
 	cwd            string
+	version        bool
 }
 
 // Commands represents the list of commands
@@ -61,15 +62,14 @@ func main() {
 	app.DispatcherHost = "http://216.16.195.147:8250/" // default dispatcher URL is on plato server
 	app.cwd, err = os.Getwd()
 	if err != nil {
-		fmt.Println(err)
-	} else {
-		fmt.Println("Current working directory:", app.cwd)
+		log.Fatalf("Failed to get current working directory: %v", err)
 	}
 
 	action := flag.String("action", "", "Action to perform: add, list, delete")
 	dsp := flag.String("d", "", "URL to dispatcher, default: "+app.DispatcherHost)
 	file := flag.String("file", "config.json5", "Path to config file (default: config.json5)")
 	sid := flag.Int64("sid", 0, "Simulation ID for delete action")
+	flag.BoolVar(&app.version, "v", false, "print the program version string")
 
 	if err := util.LoadHomeDirConfig(".psqrc", &app); err != nil {
 		if !strings.Contains(err.Error(), "no such file or directory") {
@@ -79,6 +79,10 @@ func main() {
 	}
 
 	flag.Parse()
+	if app.version {
+		fmt.Println("psq version:", util.Version())
+		return
+	}
 	app.action = *action
 	if len(*dsp) > 0 {
 		app.DispatcherHost = *dsp

@@ -61,7 +61,8 @@ check_tests:
 package:
 	mkdir -p dist/simq/man/man1
 	for dir in $(DIRS); do make -C $$dir package;done
-	cd dist ; rm -f simq.tar* ; tar cvf simq.tar simq ; gzip simq.tar
+	./mkdist.sh
+	# cd dist ; rm -f simq.tar* ; tar cvf simq.tar simq ; gzip simq.tar
 
 all: starttimer clean doit package test stoptimer
 	@echo "Completed"

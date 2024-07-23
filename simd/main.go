@@ -65,9 +65,6 @@ var app struct {
 func readCommandLineArgs() {
 	flag.BoolVar(&app.HexASCIIDbg, "D", false, "Turn on debug mode")
 	flag.BoolVar(&app.version, "v", false, "Print the program version string")
-
-	fmt.Println("Command-line arguments:", os.Args)
-
 	flag.Parse()
 }
 
@@ -107,11 +104,11 @@ func main() {
 	// HANDLE COMMAND LINE ARGUMENTS
 	//-------------------------------------
 	readCommandLineArgs()
-	app.HTTPHdrsDbg = app.HexASCIIDbg
 	if app.version {
 		fmt.Println("simd version:", util.Version())
 		os.Exit(0)
 	}
+	app.HTTPHdrsDbg = app.HexASCIIDbg
 
 	//-------------------------------------
 	// GET MY IP ADDRESS

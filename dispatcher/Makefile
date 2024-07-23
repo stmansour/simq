@@ -2,7 +2,7 @@ TOP=..
 BINDIR=${TOP}/dist/simq
 THISDIR="dispatcher"
 TEST_FAILURE_FILE=fail
-BUILD_TIME := $(shell date "+%Y-%m-%d %H:%M:%S")
+BUILD_TIME := $(shell date "+%Y%m%dT%H%M%S")
 MACHINENAME := $(shell hostname)
 
 dispatcher: *.go
