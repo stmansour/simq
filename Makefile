@@ -62,10 +62,13 @@ package:
 	mkdir -p dist/simq/man/man1
 	for dir in $(DIRS); do make -C $$dir package;done
 	./mkdist.sh
-	# cd dist ; rm -f simq.tar* ; tar cvf simq.tar simq ; gzip simq.tar
 
 post:
-	cp dist/*.gz /var/www/html/downloads/
+	@if [ "$$(hostname)" = "plato" ]; then \
+		cp dist/simq*.gz /var/www/html/downloads/; \
+	else \
+		scp -i ~/.ssh/id_platosrv dist/simq*.gz plato:/var/www/html/downloads/; \
+	fi
 
 all: starttimer clean doit package test stoptimer
 	@echo "Completed"
