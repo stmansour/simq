@@ -65,7 +65,13 @@ package:
 	# cd dist ; rm -f simq.tar* ; tar cvf simq.tar simq ; gzip simq.tar
 
 post:
-	cp dist/*.gz /var/www/html/downloads/
+	@FL=$$(ls dist/*.gz); \
+	if [ "$$(hostname)" = "plato" ]; then \
+		cp dist/plato*.gz /var/www/html/downloads/; \
+	else \
+		scp -i ~/.ssh/id_platosrv dist/plato*.gz plato:/var/www/html/downloads/; \
+	fi ; \
+	echo "copied $$FL file to /var/www/html/downloads"
 
 all: starttimer clean doit package test stoptimer
 	@echo "Completed"
