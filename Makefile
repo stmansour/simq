@@ -62,7 +62,6 @@ package:
 	mkdir -p dist/simq/man/man1
 	for dir in $(DIRS); do make -C $$dir package;done
 	./mkdist.sh
-	# cd dist ; rm -f simq.tar* ; tar cvf simq.tar simq ; gzip simq.tar
 
 post:
 	@FL=$$(ls dist/*.gz); \
