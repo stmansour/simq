@@ -66,9 +66,9 @@ package:
 post:
 	@FL=$$(ls dist/*.gz); \
 	if [ "$$(hostname)" = "plato" ]; then \
-		cp dist/plato*.gz /var/www/html/downloads/; \
+		cp dist/simq*.gz /var/www/html/downloads/; \
 	else \
-		scp -i ~/.ssh/id_platosrv dist/plato*.gz plato:/var/www/html/downloads/; \
+		scp -i ~/.ssh/id_platosrv dist/simq*.gz plato:/var/www/html/downloads/; \
 	fi ; \
 	echo "copied $$FL file to /var/www/html/downloads"
 
