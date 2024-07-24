@@ -44,12 +44,13 @@ func printStartupMessage() {
 }
 
 func printBox(lines []string, borderColor, contentColor func(a ...interface{}) string) {
-	width := 80
-
+	width := 90
 	if w, _, err := terminal.GetSize(int(os.Stdout.Fd())); err == nil {
+		// fmt.Printf("Width: %d, w = %d\n", width, w)
 		width = w
 	}
 	width -= 4
+	// fmt.Printf("Width: %d\n", width)
 
 	contentWidth := 0
 	for _, line := range lines {
@@ -62,8 +63,12 @@ func printBox(lines []string, borderColor, contentColor func(a ...interface{}) s
 	}
 
 	if contentWidth < width {
-		width = contentWidth
+		width = contentWidth + 5
 	}
+	if width < 80 {
+		width = 80
+	}
+	// fmt.Printf("contentWidth: %d, width: %d\n", contentWidth, width)
 
 	fmt.Println(borderColor("┌" + strings.Repeat("─", width+2) + "┐"))
 	for _, line := range lines {

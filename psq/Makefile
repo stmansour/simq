@@ -4,7 +4,7 @@ THISDIR=psq
 TEST_FAILURE_FILE=fail
 BUILD_TIME := $(shell date "+%Y%m%dT%H%M%S")
 
-dispatcher: *.go
+psq: *.go
 	go vet
 	golint
 	staticcheck

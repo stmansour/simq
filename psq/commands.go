@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/stmansour/simq/data"
 	"github.com/stmansour/simq/util"
@@ -94,6 +96,35 @@ func listDoneJobs(cmd *CmdData, args []string) {
 	listCore(&command)
 }
 
+// QueueItem is an item in the queue
+type QueueItem struct {
+	SID         int64
+	File        string
+	Username    string
+	Name        string
+	Priority    int
+	Description string
+	MachineID   string
+	URL         string
+	State       int
+	DtEstimate  sql.NullTime
+	DtCompleted sql.NullTime
+	Created     time.Time
+	Modified    time.Time
+}
+
+const (
+	sidWidth       = 3
+	priorityWidth  = 3
+	stateWidth     = 2
+	usernameWidth  = 15
+	fileWidth      = 15
+	dtWidth        = 20
+	machineIDWidth = 40
+	nameWidth      = 25
+)
+
+// listCore is the core function for listing jobs
 func listCore(command *util.Command) {
 	body := util.SendRequest(app.DispatcherURL, command)
 
@@ -112,27 +143,53 @@ func listCore(command *util.Command) {
 		return
 	}
 	states := []string{"Qd", "Bk", "Ex", "Fn", "Ar", "Er"}
-	// 0         1         2         3         4         5         6
-	// 01234567890123456789012345678901234567890123456789
-	// 2024/05/11 HH:MM
 
 	DtIsEstimate := command.Command == "GetActiveQueue"
-	dt := ""
 	DtCN := "Estimate"
 	if !DtIsEstimate {
 		DtCN = "Completed"
 	}
-	fmt.Printf("SID PRI ST %-15s %-15s %-20s %-40s %-25s \n", "Username", "File", DtCN, "MachineID", "Name")
+
+	// Define box-drawing characters
+	topLeft, topRight, bottomLeft, bottomRight := "┌", "┐", "└", "┘"
+	horizontal, vertical := "─", "│"
+	leftT, rightT, topT, bottomT, cross := "├", "┤", "┬", "┴", "┼"
+
+	// Print top border
+	fmt.Print(topLeft)
+	for i, width := range []int{sidWidth, priorityWidth, stateWidth, usernameWidth, fileWidth, dtWidth, machineIDWidth, nameWidth} {
+		fmt.Print(strings.Repeat(horizontal, width))
+		if i < 7 {
+			fmt.Print(topT)
+		}
+	}
+	fmt.Print(topRight + "\n")
+
+	// Print header
+	fmt.Printf("%s%-*s%s%-*s%s%-*s%s%-*s%s%-*s%s%-*s%s%-*s%s%-*s%s\n",
+		vertical, sidWidth, "SID",
+		vertical, priorityWidth, "PRI",
+		vertical, stateWidth, "ST",
+		vertical, usernameWidth, "Username",
+		vertical, fileWidth, "File",
+		vertical, dtWidth, DtCN,
+		vertical, machineIDWidth, "MachineID",
+		vertical, nameWidth, "Name",
+		vertical)
+
+	// Print separator
+	fmt.Print(leftT)
+	for i, width := range []int{sidWidth, priorityWidth, stateWidth, usernameWidth, fileWidth, dtWidth, machineIDWidth, nameWidth} {
+		fmt.Print(strings.Repeat(horizontal, width))
+		if i < 7 {
+			fmt.Print(cross)
+		}
+	}
+	fmt.Print(rightT + "\n")
+
+	// Print data rows
 	for _, item := range resp.Data {
-		nm := item.Name
-		if len(nm) > 25 {
-			nm = nm[:24] + string(rune(0x2026))
-		}
-		mid := item.MachineID
-		if len(mid) > 40 {
-			mid = mid[:34] + string(rune(0x2026))
-		}
-		dt = ""
+		dt := ""
 		if DtIsEstimate {
 			if item.DtEstimate.Valid {
 				dt = item.DtEstimate.Time.In(time.Local).Format("Jan 2, 2006 03:04pm")
@@ -143,8 +200,34 @@ func listCore(command *util.Command) {
 			}
 		}
 
-		fmt.Printf("%3d %3d %2s %-15s %-15s %-20s %-40s %-15s\n", item.SID, item.Priority, states[item.State], item.Username, item.File, dt, mid, nm)
+		fmt.Printf("%s%-*d%s%-*d%s%-*s%s%-*s%s%-*s%s%-*s%s%-*s%s%-*s%s\n",
+			vertical, sidWidth, item.SID,
+			vertical, priorityWidth, item.Priority,
+			vertical, stateWidth, states[item.State],
+			vertical, usernameWidth, truncateMiddle(item.Username, usernameWidth),
+			vertical, fileWidth, truncateMiddle(item.File, fileWidth),
+			vertical, dtWidth, dt,
+			vertical, machineIDWidth, truncateMiddle(item.MachineID, machineIDWidth),
+			vertical, nameWidth, truncateMiddle(item.Name, nameWidth),
+			vertical)
 	}
+
+	fmt.Print(bottomLeft)
+	for i, width := range []int{sidWidth, priorityWidth, stateWidth, usernameWidth, fileWidth, dtWidth, machineIDWidth, nameWidth} {
+		fmt.Print(strings.Repeat(horizontal, width))
+		if i < 7 {
+			fmt.Print(bottomT)
+		}
+	}
+	fmt.Print(bottomRight + "\n")
+}
+
+func truncateMiddle(s string, width int) string {
+	if utf8.RuneCountInString(s) <= width {
+		return s + strings.Repeat(" ", width-utf8.RuneCountInString(s))
+	}
+	half := (width - 1) / 2
+	return s[:half] + "…" + s[len(s)-half:] + strings.Repeat(" ", width-utf8.RuneCountInString(s[:half]+"…"+s[len(s)-half:]))
 }
 
 func deleteJob(cmd *CmdData, args []string) {
