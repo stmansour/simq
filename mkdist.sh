@@ -4,7 +4,7 @@
 NAME="simq"
 
 # Get the version from the simulator
-VER=$(./dist/simq/psq -v | awk '{print $3}')
+VER=$(./dist/simq/bin/psq -v | awk '{print $3}')
 
 # Determine the OS
 UNAME_S=$(uname -s)
