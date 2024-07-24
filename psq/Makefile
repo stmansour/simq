@@ -26,7 +26,8 @@ coverage:
 	go tool cover -html=coverage.out 
 
 package:
-	cp ${THISDIR} ${BINDIR}/
+	mkdir -p ${BINDIR}/bin
+	cp ${THISDIR} ${BINDIR}/bin/
 	@echo "*** ${THISDIR}: completed package ***"
 
 releaseman:

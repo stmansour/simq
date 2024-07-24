@@ -33,7 +33,9 @@ coverage:
 	go tool cover -html=coverage.out 
 
 package:
-	cp simd ${BINDIR}/
+	mkdir -p ${BINDIR}/man/man1
+	mkdir -p ${BINDIR}/simd
+	cp simd ${BINDIR}/simd/
 	@echo "*** ${THISDIR}: completed package ***"
 
 release:

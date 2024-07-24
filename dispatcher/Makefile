@@ -32,7 +32,9 @@ coverage:
 	go tool cover -html=coverage.out 
 
 package:
-	cp dispatcher ${BINDIR}/
+	mkdir -p ${BINDIR}/man/man1
+	mkdir -p ${BINDIR}/dispatcher
+	cp dispatcher ${BINDIR}/dispatcher/
 	@echo "*** ${THISDIR}: completed package ***"
 
 release: config
