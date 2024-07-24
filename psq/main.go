@@ -46,14 +46,15 @@ var Commands []DCommand
 func init() {
 	Commands = []DCommand{
 		{Command: "add", ArgCount: 1, Handler: addJob, Help: "Add a simulation to the queue"},
-		{Command: "done", ArgCount: 0, Handler: listDoneJobs, Help: "List completed simulations"},
-		{Command: "list", ArgCount: 0, Handler: listJobs, Help: "List pending simulations"},
-		{Command: "listdone", ArgCount: 0, Handler: listDoneJobs, Help: "List completed simulations"},
 		{Command: "delete", ArgCount: 1, Handler: deleteJob, Help: "Delete a simulation from the queue"},
 		{Command: "dispatcher", ArgCount: 1, Handler: setDispatcherURL, Help: "Set the URL for the dispatcher"},
+		{Command: "done", ArgCount: 0, Handler: listDoneJobs, Help: "List completed simulations"},
 		{Command: "exit", ArgCount: 0, Handler: handleExit, Help: "Exit the program"},
-		{Command: "quit", ArgCount: 0, Handler: handleExit, Help: "Exit the program"},
 		{Command: "help", ArgCount: 0, Handler: handleHelp, Help: "Show this help message"},
+		{Command: "list", ArgCount: 0, Handler: listJobs, Help: "List pending simulations"},
+		{Command: "listdone", ArgCount: 0, Handler: listDoneJobs, Help: "List completed simulations"},
+		{Command: "quit", ArgCount: 0, Handler: handleExit, Help: "Exit the program"},
+		{Command: "sid", ArgCount: 1, Handler: getSID, Help: "list details for a simulation ID"},
 	}
 }
 
@@ -185,6 +186,14 @@ func handleCmd(line string, cmd *CmdData) {
 			return
 		}
 	}
+	// See if the command is a SID
+	_, err := strconv.Atoi(command)
+	if err == nil {
+		a := []string{command}
+		getSID(cmd, a)
+		return
+	}
+
 	fmt.Println("Unknown command. Type 'help' for a list of commands.")
 }
 

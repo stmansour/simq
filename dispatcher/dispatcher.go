@@ -82,6 +82,11 @@ type SimulationBookingRequest struct {
 	Availability    string
 }
 
+// GetSIDRequest represents the data for getting a simulation ID
+type GetSIDRequest struct {
+	SID int64
+}
+
 // SimulationRebookRequest represents the data for rebooking a simulation
 type SimulationRebookRequest struct {
 	SID       int64
@@ -109,6 +114,7 @@ var handlerTable = map[string]HandlerTableEntry{
 	"GetActiveQueue":    {Handler: handleGetActiveQueue},
 	"GetCompletedQueue": {Handler: handleGetCompletedQueue},
 	"GetMachineQueue":   {Handler: handleGetMachineQueue},
+	"GetSID":            {Handler: handleGetSID},
 	"NewSimulation":     {Handler: handleNewSimulation},
 	"Rebook":            {Handler: handleBook},
 	"Shutdown":          {Handler: handleShutdown},
@@ -541,6 +547,38 @@ func handleGetMachineQueue(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	}{
 		Status: "success",
 		Data:   items,
+	}
+	SvcWriteResponse(w, &resp)
+}
+
+// handleGetSID handles the GetCompletedQueue command
+//
+//	format:  standard command header
+//	data:    SID
+//
+// -----------------------------------------------------------------------------
+func handleGetSID(w http.ResponseWriter, r *http.Request, d *HInfo) {
+	log.Printf("*** entered: handleGetSID\n")
+
+	var req GetSIDRequest
+	if err := json.Unmarshal(d.cmd.Data, &req); err != nil {
+		SvcErrorReturn(w, fmt.Errorf("failed to unmarshal request data"))
+		return
+	}
+
+	item, err := app.qm.GetItemByID(req.SID)
+	if err != nil {
+		SvcErrorReturn(w, fmt.Errorf("failed to get completed queue item"))
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	resp := struct {
+		Status string
+		Data   data.QueueItem
+	}{
+		Status: "success",
+		Data:   item,
 	}
 	SvcWriteResponse(w, &resp)
 }

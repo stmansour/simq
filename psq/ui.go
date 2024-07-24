@@ -33,7 +33,7 @@ func printStartupMessage() {
 	message = append(message,
 		"",
 		fmt.Sprintf("   Version 1.0 | %s", time.Now().Format("2006-01-02 15:04:05")),
-		fmt.Sprintf("   Dispatcher: %s", "http://216.16.195.147:8250"),
+		fmt.Sprintf("   Dispatcher: %s", app.DispatcherURL),
 		fmt.Sprintf("   Working Dir: %s", getCurrentDirectory()),
 		"",
 		"   Type 'help' for commands | ↑↓ arrows for command history",

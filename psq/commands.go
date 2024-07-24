@@ -26,16 +26,88 @@ type CreateQueueEntryRequest struct {
 	URL              string
 }
 
+// CmdGetSID represents the structure of a command
+type CmdGetSID struct {
+	SID int64
+}
+
 // Config represents the structure of a config
 type Config struct {
 	SimulationName string
-	C1             string
-	C2             string
+	Username       string
+	Data           []byte
 }
 
 const (
 	defaultPriority = 5
 )
+
+// getSID reads the queue details for the specified simulation ID
+// --------------------------------------------------------------------
+func getSID(cmd *CmdData, args []string) {
+	var err error
+	var databt CmdGetSID
+	databt.SID, err = strconv.ParseInt(args[0], 10, 64)
+	if err != nil {
+		fmt.Printf("Error: invalid simulation ID: %s\n.", args[0])
+		return
+	}
+
+	dataBytes, err := json.Marshal(databt)
+	if err != nil {
+		fmt.Printf("Error marshaling ID: %s\n.", err.Error())
+		return
+	}
+	command := util.Command{
+		Command:  "GetSID",
+		Username: cmd.Username,
+		Data:     json.RawMessage(dataBytes),
+	}
+
+	respBytes := util.SendRequest(app.DispatcherURL, &command)
+	var resp struct {
+		Status string
+		Data   data.QueueItem
+	}
+
+	err = json.Unmarshal(respBytes, &resp)
+	if err != nil {
+		fmt.Printf("Error unmarshaling response: %s\n", err.Error())
+		return
+	}
+
+	if resp.Status != "success" {
+		fmt.Printf("Error: Response status: %s\n", resp.Status)
+		return
+	}
+
+	fmt.Printf("SID: %d\n", resp.Data.SID)
+	fmt.Printf("State: %d\n", resp.Data.State)
+	fmt.Printf("Username: %s\n", resp.Data.Username)
+	fmt.Printf("File: %s\n", resp.Data.File)
+	fmt.Printf("Name: %s\n", resp.Data.Name)
+	fmt.Printf("MachineID: %s\n", resp.Data.MachineID)
+	fmt.Printf("Priority: %d\n", resp.Data.Priority)
+	fmt.Printf("Description: %s\n", resp.Data.Description)
+	fmt.Printf("URL: %s\n", resp.Data.URL)
+	fmt.Printf("Created: %s\n", resp.Data.Created.In(time.Local).Format("Jan 2, 2006 03:04pm"))
+	fmt.Printf("Modified: %s\n", resp.Data.Modified.In(time.Local).Format("Jan 2, 2006 03:04pm"))
+	dt := ""
+	if resp.Data.State < 3 {
+		if resp.Data.DtEstimate.Valid {
+			dt = "Estimated Completion: " + resp.Data.DtEstimate.Time.In(time.Local).Format("Jan 2, 2006 03:04pm")
+
+		}
+	} else {
+		if resp.Data.DtCompleted.Valid {
+			dt = "Completed: " + resp.Data.DtCompleted.Time.In(time.Local).Format("Jan 2, 2006 03:04pm")
+		}
+	}
+	if len(dt) > 0 {
+		fmt.Printf("%s\n", dt)
+	}
+
+}
 
 func addJob(cmd *CmdData, args []string) {
 	file := args[0]
