@@ -5,6 +5,9 @@ TEST_FAILURE_FILE=fail
 # Temporary file for storing start time
 TIMER_FILE := .build_timer
 
+OS := $(shell uname -s | tr '[:upper:]' '[:lower:]' | sed 's/linux/linux/; s/darwin/macos/; /macos\|linux/!s/.*/unknown/')
+CPU := $(shell uname -m | sed 's/x86_64/x86_64/; s/arm64\|aarch64/arm64/; /x86_64\|arm64/!s/.*/unknown/')
+
 .PHONY: install-tools golint staticcheck test deps
 
 doit:
@@ -62,16 +65,10 @@ package:
 	mkdir -p dist/simq/man/man1
 	mkdir -p dist/bin
 	for dir in $(DIRS); do make -C $$dir package;done
-	./mkdist.sh
+	./mkdist.sh -c
 
 post:
-	@FL=$$(ls dist/*.gz); \
-	if [ "$$(hostname)" = "plato" ]; then \
-		cp dist/simq*.gz /var/www/html/downloads/; \
-	else \
-		scp -i ~/.ssh/id_platosrv dist/simq*.gz plato:/var/www/html/downloads/; \
-	fi ; \
-	echo "copied $$FL file to /var/www/html/downloads"
+	./mkdist.sh -p
 
 all: starttimer clean doit package test stoptimer
 	@echo "Completed"
