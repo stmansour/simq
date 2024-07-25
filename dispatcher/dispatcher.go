@@ -116,6 +116,7 @@ var handlerTable = map[string]HandlerTableEntry{
 	"GetMachineQueue":   {Handler: handleGetMachineQueue},
 	"GetSID":            {Handler: handleGetSID},
 	"NewSimulation":     {Handler: handleNewSimulation},
+	"Priority":          {Handler: handlePriority},
 	"Rebook":            {Handler: handleBook},
 	"Shutdown":          {Handler: handleShutdown},
 	"UpdateItem":        {Handler: handleUpdateItem},
@@ -602,6 +603,56 @@ func handleGetCompletedQueue(w http.ResponseWriter, r *http.Request, d *HInfo) {
 		Data:   items,
 	}
 	SvcWriteResponse(w, &resp)
+}
+
+// handlePriorty handles sets the priority of the supplied sid
+// -----------------------------------------------------------------------------
+func handlePriority(w http.ResponseWriter, r *http.Request, d *HInfo) {
+	log.Printf("*** entered: handlePriority\n")
+	req := UpdateItemRequest{
+		Priority: -1,
+	}
+	//--------------------------------------------------------
+	// Unmarshal the data into the request struct. It will
+	// only set the fields supplied by the caller...
+	//--------------------------------------------------------
+	if err := json.Unmarshal(d.cmd.Data, &req); err != nil {
+		SvcErrorReturn(w, fmt.Errorf("handleUpdateItem: invalid request data"))
+		return
+	}
+
+	//--------------------------------------------------------
+	// load the existing item to establish the base values
+	//--------------------------------------------------------
+	queueItem, err := app.qm.GetItemByID(req.SID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			SvcErrorReturn(w, fmt.Errorf("handleUpdateItem: queue item %d not found", req.SID))
+		} else {
+			SvcErrorReturn(w, fmt.Errorf("handleUpdateItem: error in GetItemByID: %v", err))
+		}
+		return
+	}
+	if req.Priority < 0 {
+		SvcErrorReturn(w, fmt.Errorf("handleUpdateItem: invalid priority: %d", req.Priority))
+		return
+	}
+	//--------------------------------------------------------
+	// We only update the priority
+	//--------------------------------------------------------
+	queueItem.Priority = req.Priority
+	if err := app.qm.UpdateItem(queueItem); err != nil {
+		SvcErrorReturn(w, fmt.Errorf("handleUpdateItem: failed to update queue item"))
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	msg := SvcStatus201{
+		Status:  "success",
+		Message: "Updated",
+		ID:      queueItem.SID,
+	}
+	SvcWriteResponse(w, &msg)
 }
 
 // handleUpdateItem handles the UpdateItem command

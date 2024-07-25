@@ -52,6 +52,7 @@ func init() {
 		{Command: "e|exit|q|quit", ArgCount: 0, Handler: handleExit, Help: "Exit the program"},
 		{Command: "help", ArgCount: 0, Handler: handleHelp, Help: "Show this help message"},
 		{Command: "l|list", ArgCount: 0, Handler: listJobs, Help: "List pending simulations"},
+		{Command: "p|pri|priority", ArgCount: 2, Handler: setPriority, Help: "priority <sid> <priority> - set the priority for <sid> to <priority>"},
 		{Command: "q|quit", ArgCount: 0, Handler: handleExit, Help: "Exit the program"},
 		{Command: "sid", ArgCount: 1, Handler: getSID, Help: "sid <sid> - list details for a simulation ID. Also works with just <sid>."},
 	}

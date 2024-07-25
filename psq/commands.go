@@ -31,6 +31,12 @@ type CmdGetSID struct {
 	SID int64
 }
 
+// CmdSetPriority represents the structure of a command
+type CmdSetPriority struct {
+	SID      int64
+	Priority int
+}
+
 // Config represents the structure of a config
 type Config struct {
 	SimulationName string
@@ -41,6 +47,48 @@ type Config struct {
 const (
 	defaultPriority = 5
 )
+
+// setPriority sets the priority for the specified simulation ID
+// --------------------------------------------------------------------
+func setPriority(cmd *CmdData, args []string) {
+	var err error
+	var csp CmdSetPriority
+	csp.SID, err = strconv.ParseInt(args[0], 10, 64)
+	if err != nil {
+		fmt.Printf("Error: invalid simulation ID: %s\n.", args[0])
+		return
+	}
+
+	// convert arg[1] to an int
+	csp.Priority, err = strconv.Atoi(args[1])
+	if err != nil {
+		fmt.Printf("Error: invalid priority: %s\n.", args[01])
+		return
+	}
+
+	dataBytes, _ := json.Marshal(&csp)
+
+	command := util.Command{
+		Command:  "Priority",
+		Username: cmd.Username,
+		Data:     json.RawMessage(dataBytes),
+	}
+
+	respBytes := util.SendRequest(app.DispatcherURL, &command)
+	var resp struct {
+		Status string
+	}
+	err = json.Unmarshal(respBytes, &resp)
+	if err != nil {
+		fmt.Printf("Error unmarshaling response: %s\n", err.Error())
+		return
+	}
+	if resp.Status != "success" {
+		fmt.Printf("Error: Response status: %s\n", resp.Status)
+		return
+	}
+
+}
 
 // getSID reads the queue details for the specified simulation ID
 // --------------------------------------------------------------------
