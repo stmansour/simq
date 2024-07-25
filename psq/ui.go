@@ -197,7 +197,7 @@ func printProgressArrow(state int, width int) {
 func printEstimateOrCompleted(s *data.QueueItem, width int) {
 	var timeStr string
 	if s.State == 2 && s.DtEstimate.Valid {
-		timeStr = fmt.Sprintf("Estimate: %s", s.DtEstimate.Time.Format("Jan 02, 2006 03:04pm"))
+		timeStr = fmt.Sprintf(" Estimate: %s", s.DtEstimate.Time.Format("Jan 02, 2006 03:04pm"))
 	} else if s.State >= 3 && s.DtCompleted.Valid {
 		timeStr = fmt.Sprintf("Completed: %s", s.DtCompleted.Time.Format("Jan 02, 2006 03:04pm"))
 	}
