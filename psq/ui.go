@@ -9,6 +9,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/mattn/go-runewidth"
+	"github.com/stmansour/simq/data"
 	terminal "golang.org/x/term"
 )
 
@@ -105,80 +106,112 @@ func getCurrentDirectory() string {
 	return dir
 }
 
-// func printListOutput() {
-// 	cyan := color.New(color.FgCyan).SprintFunc()
-// 	yellow := color.New(color.FgYellow).SprintFunc()
+func printSimulationStatus(s *data.QueueItem) {
+	width := 80
+	//--------------------------------------------------------------------------
+	// Header
+	//--------------------------------------------------------------------------
+	printBorder("┏", "━", "┓", width)
+	printCenteredText("SIMULATION STATUS", width)
+	printBorder("┣", "━", "┫", width)
 
-// 	fmt.Println("\npsq> list")
+	//--------------------------------------------------------------------------
+	// Main info
+	//--------------------------------------------------------------------------
+	printTwoColumnRow(fmt.Sprintf("        SID: %d", s.SID), fmt.Sprintf(" Created: %s", s.Created.Format("Jan 02, 2006 03:04pm")), width)
+	printTwoColumnRow(fmt.Sprintf("   Username: %s", s.Username), fmt.Sprintf("Modified: %s", s.Modified.Format("Jan 02, 2006 03:04pm")), width)
+	printTwoColumnRow(fmt.Sprintf("   Priority: %d", s.Priority), "", width)
+	printBorder("┣", "━", "┫", width)
 
-// 	headers := []string{"SID", "PRI", "ST", "Username", "File", "Estimate", "MachineID", "Name"}
-// 	data := [][]string{
-// 		{"3", "5", "Ex", "steve", "long.json5", "Jul 16, 2024 07:56pm", "7cf2...7e3587c5faec", "Test-…"},
-// 		{"6", "5", "Ex", "steve", "long.json5", "Jul 16, 2024 07:58pm", "7cf2...7e3587c5faec", "Test-…"},
-// 		{"9", "5", "Ex", "steve", "long.json5", "Jul 16, 2024 08:07pm", "7cf2...7e3587c5faec", "Test-…"},
-// 	}
+	//--------------------------------------------------------------------------
+	// Name, File, and MachineID
+	//--------------------------------------------------------------------------
+	fmt.Printf("┃        Name: %-64s┃\n", s.Name)
+	fmt.Printf("┃ Config File: %-64s┃\n", s.File)
+	fmt.Printf("┃   MachineID: %-64s┃\n", s.MachineID)
+	printBorder("┣", "━", "┫", width)
 
-// 	printTable("ACTIVE SIMULATIONS", headers, data, cyan, yellow)
+	//--------------------------------------------------------------------------
+	// Status
+	//--------------------------------------------------------------------------
+	fmt.Printf("┃      Status:%s┃\n", strings.Repeat(" ", 65))
+	printStatusBoxes(s.State, width)
+	printProgressArrow(s.State, width)
+	printEstimateOrCompleted(s, width)
+	printBorder("┣", "━", "┫", width)
 
-// 	fmt.Println("\npsq>")
-// }
+	//--------------------------------------------------------------------------
+	// Current State
+	//--------------------------------------------------------------------------
+	fmt.Printf("┃       State: %-64s┃\n", getStateName(s.State))
+	printBorder("┣", "━", "┫", width)
 
-// func printTable(title string, headers []string, data [][]string, borderColor, contentColor func(a ...interface{}) string) {
-// 	// Calculate column widths
-// 	widths := make([]int, len(headers))
-// 	for i, header := range headers {
-// 		widths[i] = len(header)
-// 		for _, row := range data {
-// 			if len(row[i]) > widths[i] {
-// 				widths[i] = len(row[i])
-// 			}
-// 		}
-// 	}
+	//--------------------------------------------------------------------------
+	// Description
+	//--------------------------------------------------------------------------
+	fmt.Printf("┃ Description:%s┃\n", strings.Repeat(" ", 65))
+	description := s.Description
+	fmt.Printf("┃ %-77s┃\n", description)
 
-// 	// Print title
-// 	totalWidth := sum(widths) + len(widths)*3 + 1
-// 	fmt.Printf("%s %s %s\n",
-// 		borderColor("╭"+strings.Repeat("─", (totalWidth-len(title))/2-2)),
-// 		contentColor(title),
-// 		borderColor(strings.Repeat("─", (totalWidth-len(title))/2-1)+"╮"))
+	//--------------------------------------------------------------------------
+	// Footer
+	//--------------------------------------------------------------------------
+	printBorder("┗", "━", "┛", width)
+}
 
-// 	// Print headers
-// 	printRow(headers, widths, borderColor, contentColor)
+func printBorder(left, middle, right string, width int) {
+	fmt.Printf("%s%s%s\n", left, strings.Repeat(middle, width-2), right)
+}
 
-// 	// Print separator
-// 	fmt.Print(borderColor("├"))
-// 	for i, w := range widths {
-// 		fmt.Print(borderColor(strings.Repeat("─", w+2)))
-// 		if i < len(widths)-1 {
-// 			fmt.Print(borderColor("┼"))
-// 		}
-// 	}
-// 	fmt.Println(borderColor("┤"))
+func printCenteredText(text string, width int) {
+	padding := (width - len(text) - 2) / 2
+	fmt.Printf("┃%s%s%s┃\n", strings.Repeat(" ", padding), text, strings.Repeat(" ", width-padding-len(text)-2))
+}
 
-// 	// Print data
-// 	for _, row := range data {
-// 		printRow(row, widths, borderColor, contentColor)
-// 	}
+func printTwoColumnRow(left, right string, width int) {
+	fmt.Printf("┃ %-37s┃ %-38s┃\n", truncateMiddle(left, 36), truncateMiddle(right, 37))
+}
 
-// 	// Print bottom border
-// 	fmt.Println(borderColor("╰" + strings.Repeat("─", totalWidth-2) + "╯"))
-// }
+func printStatusBoxes(state int, width int) {
+	states := []string{"Queued", "Booked", "Executing", "Finished", "Archived"}
+	boxes := make([]string, len(states))
+	for i, s := range states {
+		if i <= state {
+			boxes[i] = fmt.Sprintf("[✓] %-8s", s)
+		} else {
+			boxes[i] = fmt.Sprintf("[ ] %-8s", s)
+		}
+	}
+	fmt.Printf("┃ %-77s┃\n", strings.Join(boxes, "    "))
+}
 
-// func printRow(row []string, widths []int, borderColor, contentColor func(a ...interface{}) string) {
-// 	fmt.Print(borderColor("│"))
-// 	for i, cell := range row {
-// 		fmt.Printf("%s %*s %s",
-// 			contentColor(""),
-// 			-widths[i], cell,
-// 			borderColor("│"))
-// 	}
-// 	fmt.Println()
-// }
+func printProgressArrow(state int, width int) {
+	arrowLength := (state + 1) * 15
+	if arrowLength > 75 {
+		arrowLength = 75
+	}
+	arrow := strings.Repeat("═", arrowLength) + "▶" + strings.Repeat(" ", 75-arrowLength)
+	fmt.Printf("┃ %-77s┃\n", arrow)
+}
 
-// func sum(nums []int) int {
-// 	total := 0
-// 	for _, num := range nums {
-// 		total += num
-// 	}
-// 	return total
-// }
+func printEstimateOrCompleted(s *data.QueueItem, width int) {
+	var timeStr string
+	if s.State == 2 && s.DtEstimate.Valid {
+		timeStr = fmt.Sprintf("Estimate: %s", s.DtEstimate.Time.Format("Jan 02, 2006 03:04pm"))
+	} else if s.State >= 3 && s.DtCompleted.Valid {
+		timeStr = fmt.Sprintf("Completed: %s", s.DtCompleted.Time.Format("Jan 02, 2006 03:04pm"))
+	}
+	if timeStr != "" {
+		fmt.Printf("┃%47s%-17s┃\n", "", timeStr)
+	} else {
+		fmt.Printf("┃%s┃\n", strings.Repeat(" ", 78))
+	}
+}
+
+func getStateName(state int) string {
+	states := []string{"Queued", "Booked", "Executing", "Finished", "Archived", "Error"}
+	if state >= 0 && state < len(states) {
+		return states[state]
+	}
+	return "Unknown"
+}

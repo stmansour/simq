@@ -81,32 +81,7 @@ func getSID(cmd *CmdData, args []string) {
 		return
 	}
 
-	fmt.Printf("SID: %d\n", resp.Data.SID)
-	fmt.Printf("State: %d\n", resp.Data.State)
-	fmt.Printf("Username: %s\n", resp.Data.Username)
-	fmt.Printf("File: %s\n", resp.Data.File)
-	fmt.Printf("Name: %s\n", resp.Data.Name)
-	fmt.Printf("MachineID: %s\n", resp.Data.MachineID)
-	fmt.Printf("Priority: %d\n", resp.Data.Priority)
-	fmt.Printf("Description: %s\n", resp.Data.Description)
-	fmt.Printf("URL: %s\n", resp.Data.URL)
-	fmt.Printf("Created: %s\n", resp.Data.Created.In(time.Local).Format("Jan 2, 2006 03:04pm"))
-	fmt.Printf("Modified: %s\n", resp.Data.Modified.In(time.Local).Format("Jan 2, 2006 03:04pm"))
-	dt := ""
-	if resp.Data.State < 3 {
-		if resp.Data.DtEstimate.Valid {
-			dt = "Estimated Completion: " + resp.Data.DtEstimate.Time.In(time.Local).Format("Jan 2, 2006 03:04pm")
-
-		}
-	} else {
-		if resp.Data.DtCompleted.Valid {
-			dt = "Completed: " + resp.Data.DtCompleted.Time.In(time.Local).Format("Jan 2, 2006 03:04pm")
-		}
-	}
-	if len(dt) > 0 {
-		fmt.Printf("%s\n", dt)
-	}
-
+	printSimulationStatus(&resp.Data)
 }
 
 func addJob(cmd *CmdData, args []string) {

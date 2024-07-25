@@ -45,16 +45,15 @@ var Commands []DCommand
 
 func init() {
 	Commands = []DCommand{
-		{Command: "add", ArgCount: 1, Handler: addJob, Help: "Add a simulation to the queue"},
-		{Command: "delete", ArgCount: 1, Handler: deleteJob, Help: "Delete a simulation from the queue"},
-		{Command: "dispatcher", ArgCount: 1, Handler: setDispatcherURL, Help: "Set the URL for the dispatcher"},
-		{Command: "done", ArgCount: 0, Handler: listDoneJobs, Help: "List completed simulations"},
-		{Command: "exit", ArgCount: 0, Handler: handleExit, Help: "Exit the program"},
+		{Command: "a|add", ArgCount: 1, Handler: addJob, Help: "add <filename> - add a simulation to the queue"},
+		{Command: "delete", ArgCount: 1, Handler: deleteJob, Help: "delete <sid> - delete a simulation from the queue"},
+		{Command: "dispatcher", ArgCount: 1, Handler: setDispatcherURL, Help: "dispatcher <url> - Set the URL for the dispatcher"},
+		{Command: "d|done", ArgCount: 0, Handler: listDoneJobs, Help: "List completed simulations"},
+		{Command: "e|exit|q|quit", ArgCount: 0, Handler: handleExit, Help: "Exit the program"},
 		{Command: "help", ArgCount: 0, Handler: handleHelp, Help: "Show this help message"},
-		{Command: "list", ArgCount: 0, Handler: listJobs, Help: "List pending simulations"},
-		{Command: "listdone", ArgCount: 0, Handler: listDoneJobs, Help: "List completed simulations"},
-		{Command: "quit", ArgCount: 0, Handler: handleExit, Help: "Exit the program"},
-		{Command: "sid", ArgCount: 1, Handler: getSID, Help: "list details for a simulation ID"},
+		{Command: "l|list", ArgCount: 0, Handler: listJobs, Help: "List pending simulations"},
+		{Command: "q|quit", ArgCount: 0, Handler: handleExit, Help: "Exit the program"},
+		{Command: "sid", ArgCount: 1, Handler: getSID, Help: "sid <sid> - list details for a simulation ID. Also works with just <sid>."},
 	}
 }
 
@@ -106,9 +105,12 @@ func main() {
 	line := ""
 	if *action != "" {
 		for i := range Commands {
-			if Commands[i].Command == *action {
-				line += Commands[i].Command
-				break
+			ss := strings.Split(Commands[i].Command, "|")
+			for j := 0; j < len(ss); j++ {
+				if ss[j] == *action {
+					line += ss[j]
+					break
+				}
 			}
 		}
 	}
@@ -177,13 +179,16 @@ func handleCmd(line string, cmd *CmdData) {
 
 	command := strings.ToLower(args[0])
 	for _, dcmd := range Commands {
-		if dcmd.Command == command {
-			if len(args)-1 != dcmd.ArgCount {
-				fmt.Printf("%s requires %d argument(s).\n", dcmd.Command, dcmd.ArgCount)
+		ss := strings.Split(dcmd.Command, "|")
+		for j := 0; j < len(ss); j++ {
+			if ss[j] == command {
+				if len(args)-1 != dcmd.ArgCount {
+					fmt.Printf("%s requires %d argument(s).\n", dcmd.Command, dcmd.ArgCount)
+					return
+				}
+				dcmd.Handler(cmd, args[1:])
 				return
 			}
-			dcmd.Handler(cmd, args[1:])
-			return
 		}
 	}
 	// See if the command is a SID
