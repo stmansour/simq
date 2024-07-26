@@ -4,6 +4,7 @@ THISDIR="dispatcher"
 TEST_FAILURE_FILE=fail
 BUILD_TIME := $(shell date "+%Y%m%dT%H%M%S")
 MACHINENAME := $(shell hostname)
+OS := $(shell uname -s)
 
 dispatcher: *.go
 	go vet
@@ -32,10 +33,13 @@ coverage:
 	go tool cover -html=coverage.out 
 
 package:
-	mkdir -p ${BINDIR}/man/man1
+ifeq ($(OS),Darwin)
+	@echo "Skipping package commands on macOS."
+else
 	mkdir -p ${BINDIR}/dispatcher
 	cp dispatcher ${BINDIR}/dispatcher/
 	@echo "*** ${THISDIR}: completed package ***"
+endif
 
 release: config
 	mkdir -p /usr/local/simq/dispatcher/

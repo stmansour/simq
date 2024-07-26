@@ -62,8 +62,7 @@ check_tests:
 		fi
 
 package:
-	mkdir -p dist/simq/man/man1
-	mkdir -p dist/bin
+	mkdir -p dist/simq/bin
 	for dir in $(DIRS); do make -C $$dir package;done
 	./mkdist.sh -c
 

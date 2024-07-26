@@ -33,10 +33,14 @@ coverage:
 	go tool cover -html=coverage.out 
 
 package:
-	mkdir -p ${BINDIR}/man/man1
 	mkdir -p ${BINDIR}/simd
 	cp simd ${BINDIR}/simd/
 	@echo "*** ${THISDIR}: completed package ***"
+
+macpackage:
+	cd dist
+	rm -f *.tar.gz
+	pkgbuild --root simq --identifier com.mpalfunds.simq --version 1.0 --install-location /usr/local/simq simq.pkg
 
 release:
 	mkdir -p /usr/local/simq/simd

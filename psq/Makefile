@@ -27,7 +27,6 @@ coverage:
 
 package:
 	mkdir -p ${BINDIR}/bin
-	mkdir -p ${BINDIR}/man/man1
 	cp ${THISDIR} ${BINDIR}/bin/
 	@echo "*** ${THISDIR}: completed package ***"
 
