@@ -84,6 +84,7 @@ func doMain() {
 	if ex, err = util.LoadConfig(ex, "dispatcher.json5"); err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
+	log.Printf("Database: %s\n", ex.DbName)
 	cmd := ex.GetSQLOpenString(ex.DbName)
 	setMyNetworkAddress()
 	log.Printf("Dispatcher Network Address: %s\n", app.DispatcherURL)

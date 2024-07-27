@@ -2,9 +2,10 @@
 RUNSINGLETEST=0
 TESTCOUNT=0
 ERRORCOUNT=0
+DISPATCHEROFF=0
 DISPATCHER_RUNNING=0
-RESDIR=$(grep "SimResultsDir" dispatcher.json5| sed 's/".*"://' | sed 's/[", ]//g')
-QDIR=$(grep "DispatcherQueueDir" dispatcher.json5| sed 's/".*"://' | sed 's/[", ]//g')
+RESDIR=$(grep "SimResultsDir" dispatcher.json5 | sed 's/".*"://' | sed 's/[", ]//g')
+QDIR=$(grep "DispatcherQueueDir" dispatcher.json5 | sed 's/".*"://' | sed 's/[", ]//g')
 MYSQL=$(which mysql)
 
 echo "MySQL: ${MYSQL}"
@@ -43,21 +44,21 @@ EOF
 #       none
 #############################################################################
 pause() {
-	read -rp "Press [Enter] to continue, M to move ${2} to gold/${2}.gold, Q or X to quit..." x
-	x=$(echo "${x}" | tr "[:upper:]" "[:lower:]")
-	if [ "${x}" == "q" ] || [ "${x}" == "x" ]; then
-		if [ "${MANAGESERVER}" -eq 1 ]; then
-			echo "STOPPING DISPATCHER"
-			pkill dispatcher
-		fi
-		exit 0
+    read -rp "Press [Enter] to continue, M to move gold, Q or X to quit..." x
+    x=$(echo "${x}" | tr "[:upper:]" "[:lower:]")
+    if [ "${x}" == "q" ] || [ "${x}" == "x" ]; then
+        if [ "${MANAGESERVER}" -eq 1 ]; then
+            echo "STOPPING DISPATCHER"
+            pkill dispatcher
+        fi
+        exit 0
     fi
 }
 
 # Function to check if a string is valid JSON
 #------------------------------------------------------------------------------
 is_json() {
-    echo "$1" | jq empty > /dev/null 2>&1
+    echo "$1" | jq empty >/dev/null 2>&1
     return $?
 }
 
@@ -67,13 +68,13 @@ send_command() {
     local CMD=$1
     local DESCRIPTION=$2
     local RESPONSE
-    echo "Sending ${DESCRIPTION} command: curl -s -X POST http://localhost:8250/command -d '${CMD}' -H 'Content-Type: application/json'" >> ${RESFILE}
+    echo "Sending ${DESCRIPTION} command: curl -s -X POST http://localhost:8250/command -d '${CMD}' -H 'Content-Type: application/json'" >>${RESFILE}
     RESPONSE=$(curl -s -X POST http://localhost:8250/command -d "${CMD}" -H "Content-Type: application/json")
-    echo "Response: ${RESPONSE}" >> serverresponse
+    echo "Response: ${RESPONSE}" >>serverresponse
     if is_json "${RESPONSE}"; then
-        echo "${RESPONSE}" | jq . >> ${RESFILE}
+        echo "${RESPONSE}" | jq . >>${RESFILE}
     else
-        echo "${RESPONSE}" >> ${RESFILE}
+        echo "${RESPONSE}" >>${RESFILE}
     fi
 }
 
@@ -91,14 +92,13 @@ send_command_with_file() {
 
     # Encode CMD_FULL as a string to include in the curl command
     CMD_FULL_STR=$(echo "${CMD_FULL}" | jq -c .)
-
-    echo "Sending ${DESCRIPTION} command with file: curl -s -X POST http://localhost:8250/command -F 'data=${CMD_FULL_STR}' -F 'file=@${FILE}'" >> ${RESFILE}
+    echo "Sending ${DESCRIPTION} command with file: curl -s -X POST http://localhost:8250/command -F 'data=${CMD_FULL_STR}' -F 'file=@${FILE}'" >>${RESFILE}
     RESPONSE=$(curl -s -X POST http://localhost:8250/command -F "data=${CMD_FULL_STR}" -F "file=@${FILE}")
-    echo "Response: ${RESPONSE}" >> serverresponse
+    echo "Response: ${RESPONSE}" >>serverresponse
     if is_json "${RESPONSE}"; then
-        echo "${RESPONSE}" | jq . >> ${RESFILE}
+        echo "${RESPONSE}" | jq . >>${RESFILE}
     else
-        echo "${RESPONSE}" >> ${RESFILE}
+        echo "${RESPONSE}" >>${RESFILE}
     fi
 }
 
@@ -143,7 +143,7 @@ compareToGold() {
 
     # Compare the normalized report to the gold standard
     if diff "${normalizedFile}" "${goldFile}"; then
-        echo  "PASSED"
+        echo "PASSED"
         rm "${normalizedFile}"
     else
         echo "Differences detected.  meld ${normalizedFile} ${goldFile}"
@@ -179,6 +179,7 @@ compareToGold() {
 #    none yet
 #------------------------------------------------------------------------------
 setupData() {
+    # echo "Setting up data for ${TFILES}"
     #---------------------------
     # first clean directories
     #---------------------------
@@ -187,16 +188,20 @@ setupData() {
     #---------------------------
     # clean database
     #---------------------------
-    ${MYSQL} simqtest < testdata/${TFILES}/simq.sql
-    # sleep 1
+    if [ -f testdata/${TFILES}/simq.sql ]; then
+        ${MYSQL} simqtest <testdata/${TFILES}/simq.sql
+    else
+        echo "DROP TABLE IF EXISTS Queue;" | ${MYSQL} simqtest
+        rm -rf qdconfigs
+    fi
     #---------------------------
     # Initialize datafiles
     #---------------------------
     if [ -f testdata/${TFILES}/res.tar ]; then
-        tar xvf "testdata/${TFILES}/res.tar" -C "${RESDIR}"
+        tar xf "testdata/${TFILES}/res.tar" -C "${RESDIR}"
     fi
     if [ -f testdata/${TFILES}/qdata.tar ]; then
-        tar xvf "testdata/${TFILES}/qdata.tar" -C "${QDIR}"
+        tar xf "testdata/${TFILES}/qdata.tar" -C "${QDIR}"
     fi
 }
 
@@ -206,15 +211,8 @@ setupData() {
 #    none yet
 #------------------------------------------------------------------------------
 startDispatcher() {
-    if ((DISPATCHER_RUNNING == 0)); then
+    if ((DISPATCHER_RUNNING == 0 && DISPATCHEROFF == 0)); then
         killall -9 dispatcher >/dev/null 2>&1
-
-        #-------------------------------------------------------
-        # start a new dispatcher with a clean database table
-        #-------------------------------------------------------
-        echo "DROP TABLE IF EXISTS Queue;" | ${MYSQL} simqtest
-        rm -rf qdconfigs
-
         ./dispatcher >DISPATCHER.log 2>&1 &
         DISPATCHER_PID=$!
         sleep 2
@@ -225,12 +223,16 @@ startDispatcher() {
 ###############################################################################
 #    INPUT
 ###############################################################################
-while getopts "at:" o; do
+while getopts "adt:" o; do
     echo "o = ${o}"
     case "${o}" in
     a)
         ASKBEFOREEXIT=1
         echo "WILL ASK BEFORE EXITING ON ERROR"
+        ;;
+    d)
+        DISPATCHEROFF=1
+        echo "WILL NOT RUN DISPATCHER IN THIS TEST. YOU MUST RUN SEPARATELY"
         ;;
     t)
         SINGLETEST="${OPTARG}"
@@ -252,11 +254,12 @@ shift $((OPTIND - 1))
 TFILES="a"
 STEP=0
 if [[ "${SINGLETEST}${TFILES}" = "${TFILES}" || "${SINGLETEST}${TFILES}" = "${TFILES}${TFILES}" ]]; then
+    setupData
     startDispatcher
     echo -n "Test ${TFILES} - Basic dispatcher test... "
 
     RESFILE="${TFILES}${STEP}"
-    echo "Result File: ${RESFILE}" > ${RESFILE}
+    echo "Result File: ${RESFILE}" >${RESFILE}
 
     #----------------------------------
     # Create a new simulation
@@ -283,18 +286,18 @@ if [[ "${SINGLETEST}${TFILES}" = "${TFILES}" || "${SINGLETEST}${TFILES}" = "${TF
     # Shutdown the server
     #----------------------------------
     SHUTDOWN_CMD='{ "command": "Shutdown", "username": "test-user" }'
-    echo "Shutting down the server with command: ${SHUTDOWN_CMD}"  >> ${RESFILE}
+    echo "Shutting down the server with command: ${SHUTDOWN_CMD}" >>${RESFILE}
     SHUTDOWN_RESPONSE=$(curl -s -X POST -H "Content-Type: application/json" -d "${SHUTDOWN_CMD}" http://localhost:8250/command)
-    echo "Shutdown Response: ${SHUTDOWN_RESPONSE}" >> ${RESFILE}
+    echo "Shutdown Response: ${SHUTDOWN_RESPONSE}" >>${RESFILE}
 
     #---------------------------------------
     # Wait for the dispatcher to shutdown
     #---------------------------------------
     sleep 2
-    if ps -p "${DISPATCHER_PID}" > /dev/null; then
-        echo "Dispatcher still running after shutdown command" >> ${RESFILE}
+    if ps -p "${DISPATCHER_PID}" >/dev/null; then
+        echo "Dispatcher still running after shutdown command" >>${RESFILE}
     else
-        echo "Dispatcher has shut down successfully" >> ${RESFILE}
+        echo "Dispatcher has shut down successfully" >>${RESFILE}
         DISPATCHER_RUNNING=0
     fi
     compareToGold ${RESFILE}
@@ -308,26 +311,31 @@ fi
 TFILES="b"
 STEP=0
 if [[ "${SINGLETEST}${TFILES}" = "${TFILES}" || "${SINGLETEST}${TFILES}" = "${TFILES}${TFILES}" ]]; then
+    if [ ! -f config.json5 ]; then
+        echo "Missing config.json5. Please copy config.json5 to this directory and try again."
+        exit 1
+    fi
+    setupData
     startDispatcher
     echo -n "Test ${TFILES} - Book a simulation... "
 
     RESFILE="${TFILES}${STEP}"
-    echo "Result File: ${RESFILE}" > ${RESFILE}
+    echo "Result File: ${RESFILE}" >${RESFILE}
 
     #----------------------------------
     # Create a new simulation
     #----------------------------------
     ADD_CMD='{"name":"Test Simulation","priority":5,"description":"A test simulation","url":"http://localhost:8080","OriginalFilename":"config.json5"}'
     send_command_with_file "NewSimulation" "${ADD_CMD}" "config.json5"
-    sleep 2  # Small delay to ensure the command is processed
+    sleep 2 # Small delay to ensure the command is processed
 
     #----------------------------------
     # Book the simulation
     #----------------------------------
     BOOK_CMD='{"command":"Book","username":"test-user","data":{"MachineID":"test-machine","CPUs":10,"Memory":"64GB","CPUArchitecture":"ARM64","Availability":"always"}}'
-    echo "Sending Book command: ${BOOK_CMD}" >> ${RESFILE}
+    echo "Sending Book command: ${BOOK_CMD}" >>${RESFILE}
     RESPONSE=$(curl -s -X POST -H "Content-Type: application/json" -d "${BOOK_CMD}" http://localhost:8250/command)
-    sleep 1  # Ensure the response is fully captured
+    sleep 1 # Ensure the response is fully captured
 
     # Handle multipart response
     BOUNDARY=$(echo "${RESPONSE}" | grep -o 'boundary=[^;]*' | cut -d '=' -f 2)
@@ -363,9 +371,9 @@ if [[ "${SINGLETEST}${TFILES}" = "${TFILES}" || "${SINGLETEST}${TFILES}" = "${TF
     #---------------------------------------
     PID=$(pgrep dispatcher)
     if [ "${PID}x" != "x" ]; then
-        echo "Dispatcher still running after shutdown command" >> ${RESFILE}
+        echo "Dispatcher still running after shutdown command" >>${RESFILE}
     else
-        echo "Dispatcher has shut down successfully" >> ${RESFILE}
+        echo "Dispatcher has shut down successfully" >>${RESFILE}
         DISPATCHER_RUNNING=0
     fi
 
@@ -388,13 +396,13 @@ if [[ "${SINGLETEST}${TFILES}" = "${TFILES}" || "${SINGLETEST}${TFILES}" = "${TF
     # Redo simulation 5
     #----------------------------------
     REDO_CMD='{"command":"Redo","username":"test-user","data":{"SID":5,"MachineID":"test-machine"}}'
-    # echo "Sending Book command: ${REDO_CMD}" 
+    # echo "Sending Book command: ${REDO_CMD}"
     RESPONSE=$(curl -s -X POST -H "Content-Type: application/json" -d "${REDO_CMD}" http://localhost:8250/command)
-    sleep 1  # Ensure the response is fully captured
+    sleep 1 # Ensure the response is fully captured
     RESFILE="${TFILES}${STEP}"
-    echo "${RESPONSE}" > "${RESFILE}"
+    echo "${RESPONSE}" >"${RESFILE}"
     compareToGold "${RESFILE}"
-
+    ((TESTCOUNT++))
 fi
 
 echo "Total tests: ${TESTCOUNT}"
