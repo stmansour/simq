@@ -5,6 +5,6 @@
     "MaxSimulations": 2,
     "SimdSimulationsDir": "/var/lib/simd",
     "DispatcherQueueDir": "/var/lib/dispatcher",
-    "SimResultsDir": "/opt/TestSimResultsRepo",
+    "SimResultsDir": "/opt/testsimres",
     "DispatcherURL": "http://127.0.0.1:8250/"
 }

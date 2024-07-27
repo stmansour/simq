@@ -348,6 +348,46 @@ func deleteJob(cmd *CmdData, args []string) {
 
 	resp := util.SendRequest(app.DispatcherURL, &command)
 	if resp != nil {
-		fmt.Printf("Delete Job Response: %s\n", string(resp))
+		var msg struct {
+			Status  string
+			Message string
+			ID      int64
+		}
+		json.Unmarshal(resp, &msg)
+		fmt.Printf("SID %d: %s\n", msg.ID, msg.Message)
+	}
+
+}
+
+func handleRedo(cmd *CmdData, args []string) {
+	sid, err := strconv.ParseInt(args[0], 10, 64)
+	if err != nil {
+		fmt.Println("Error: 'redo' command requires a valid simulation ID.")
+		return
+	}
+	cmd.SID = sid
+
+	data := struct {
+		SID int64
+	}{
+		SID: cmd.SID,
+	}
+
+	dataBytes, _ := json.Marshal(data)
+	command := util.Command{
+		Command:  "Redo",
+		Username: cmd.Username,
+		Data:     json.RawMessage(dataBytes),
+	}
+
+	resp := util.SendRequest(app.DispatcherURL, &command)
+	if resp != nil {
+		var msg struct {
+			Status  string
+			Message string
+			ID      int64
+		}
+		json.Unmarshal(resp, &msg)
+		fmt.Printf("SID %d: %s\n", msg.ID, msg.Message)
 	}
 }

@@ -47,13 +47,14 @@ func init() {
 	Commands = []DCommand{
 		{Command: "a|add", ArgCount: 1, Handler: addJob, Help: "add <filename> - add a simulation to the queue"},
 		{Command: "delete", ArgCount: 1, Handler: deleteJob, Help: "delete <sid> - delete a simulation from the queue"},
-		{Command: "dispatcher", ArgCount: 1, Handler: setDispatcherURL, Help: "dispatcher <url> - Set the URL for the dispatcher"},
+		{Command: "disp|dispatcher", ArgCount: 1, Handler: setDispatcherURL, Help: "dispatcher <url> - Set the URL for the dispatcher"},
 		{Command: "d|done", ArgCount: 0, Handler: listDoneJobs, Help: "List completed simulations"},
 		{Command: "e|exit|q|quit", ArgCount: 0, Handler: handleExit, Help: "Exit the program"},
-		{Command: "help", ArgCount: 0, Handler: handleHelp, Help: "Show this help message"},
+		{Command: "help|?", ArgCount: 0, Handler: handleHelp, Help: "Show this help message"},
 		{Command: "l|list", ArgCount: 0, Handler: listJobs, Help: "List pending simulations"},
 		{Command: "p|pri|priority", ArgCount: 2, Handler: setPriority, Help: "priority <sid> <priority> - set the priority for <sid> to <priority>"},
 		{Command: "q|quit", ArgCount: 0, Handler: handleExit, Help: "Exit the program"},
+		{Command: "r|redo", ArgCount: 1, Handler: handleRedo, Help: "redo <sid> - redo simulation <sid>"},
 		{Command: "sid", ArgCount: 1, Handler: getSID, Help: "sid <sid> - list details for a simulation ID. Also works with just <sid>."},
 	}
 }
@@ -209,7 +210,9 @@ func handleExit(cmd *CmdData, args []string) {
 
 func handleHelp(cmd *CmdData, args []string) {
 	for _, dcmd := range Commands {
-		fmt.Printf("%s: %s\n", dcmd.Command, dcmd.Help)
+		ss := strings.Split(dcmd.Command, "|")
+		s := strings.Join(ss, ", ")
+		fmt.Printf("%s: %s\n", s, dcmd.Help)
 	}
 }
 func setDispatcherURL(cmd *CmdData, args []string) {

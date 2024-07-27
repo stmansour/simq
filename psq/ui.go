@@ -168,11 +168,11 @@ func printCenteredText(text string, width int) {
 	fmt.Printf("┃%s%s%s┃\n", strings.Repeat(" ", padding), text, strings.Repeat(" ", width-padding-len(text)-2))
 }
 
-func printTwoColumnRow(left, right string, width int) {
+func printTwoColumnRow(left, right string, _ int) {
 	fmt.Printf("┃ %-37s┃ %-38s┃\n", truncateMiddle(left, 36), truncateMiddle(right, 37))
 }
 
-func printStatusBoxes(state int, width int) {
+func printStatusBoxes(state int, _ int) {
 	states := []string{"Queued", "Booked", "Executing", "Finished", "Archived"}
 	boxes := make([]string, len(states))
 	for i, s := range states {
@@ -185,7 +185,7 @@ func printStatusBoxes(state int, width int) {
 	fmt.Printf("┃ %-77s┃\n", strings.Join(boxes, "    "))
 }
 
-func printProgressArrow(state int, width int) {
+func printProgressArrow(state int, _ int) {
 	arrowLength := (state + 1) * 15
 	if arrowLength > 75 {
 		arrowLength = 75
@@ -194,7 +194,7 @@ func printProgressArrow(state int, width int) {
 	fmt.Printf("┃ %-77s┃\n", arrow)
 }
 
-func printEstimateOrCompleted(s *data.QueueItem, width int) {
+func printEstimateOrCompleted(s *data.QueueItem, _ int) {
 	var timeStr string
 	if s.State == 2 && s.DtEstimate.Valid {
 		timeStr = fmt.Sprintf(" Estimate: %s", s.DtEstimate.Time.Format("Jan 02, 2006 03:04pm"))

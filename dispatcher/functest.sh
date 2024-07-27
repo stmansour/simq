@@ -4,6 +4,7 @@ TESTCOUNT=0
 ERRORCOUNT=0
 DISPATCHEROFF=0
 DISPATCHER_RUNNING=0
+LOADTESTDATAONLY=0
 RESDIR=$(grep "SimResultsDir" dispatcher.json5 | sed 's/".*"://' | sed 's/[", ]//g')
 QDIR=$(grep "DispatcherQueueDir" dispatcher.json5 | sed 's/".*"://' | sed 's/[", ]//g')
 MYSQL=$(which mysql)
@@ -16,22 +17,44 @@ usage() {
 SYNOPSIS
 	$0 [-a -t]
 
-	Run the tests and compare the output of each test step to its associated
+    Run the tests and compare the output of each test step to its associated
     known-good output. If they miscompare, fail and stop the script. If they
     match, keep going until all tasks are completed.
 
 OPTIONS
-	-a  If a test fails, pause after showing diffs from gold files, prompt
-	    for what to do next:  [Enter] to continue, m to move the output file
-	    into gold/ , or Q / X to exit.
+    -a  If a test fails, pause after showing diffs from gold files, prompt
+        for what to do next:  [Enter] to continue, m to move the output file
+        into gold/ , or Q / X to exit.
+
+    -d  Do not run the dispatcher.  This is useful if you just want to run the
+        dispatcher in the debugger and use this program's infrastructure to
+        setup the data based on some of the test cases.
+
+    -k  Just load the data for the specified test case (use with -t).  This is
+        useful if you want to test dispatcher with a different program, like
+        psq.
 
     -h  display this help information.
 
-	-t  Sets the environment variable RUNSINGLETEST to the supplied value. By
-	    default, "${RUNSINGLETEST}x" == "x" and this should cause all of the
-	    tests in the script to run. But if you would like to be able to run
-	    an individual test by name, you can use ${RUNSINGLETEST} to check and
-	    see if the user has requested a specific test.
+    -t  Sets the environment variable RUNSINGLETEST to the supplied value. By
+        default, "${RUNSINGLETEST}x" == "x" and this should cause all of the
+        tests in the script to run. But if you would like to be able to run
+        an individual test by name, you can use ${RUNSINGLETEST} to check and
+        see if the user has requested a specific test.
+
+EXAMPLES
+    $0
+    Run all the tests
+
+    $0 -a
+    Run all the tests and pause after any failures to allow you to exit or
+    even change the gold files to match your output.
+
+    $0 -t b
+    Run only test b
+    
+    $0 -k c
+    Just set up the data and directories with the data for test c.
 EOF
 }
 
@@ -188,8 +211,8 @@ setupData() {
     #---------------------------
     # clean database
     #---------------------------
-    if [ -f testdata/${TFILES}/simq.sql ]; then
-        ${MYSQL} simqtest <testdata/${TFILES}/simq.sql
+    if [ -f testdata/"${TFILES}"/simq.sql ]; then
+        ${MYSQL} simqtest <testdata/"${TFILES}"/simq.sql
     else
         echo "DROP TABLE IF EXISTS Queue;" | ${MYSQL} simqtest
         rm -rf qdconfigs
@@ -197,10 +220,10 @@ setupData() {
     #---------------------------
     # Initialize datafiles
     #---------------------------
-    if [ -f testdata/${TFILES}/res.tar ]; then
+    if [ -f testdata/"${TFILES}"/res.tar ]; then
         tar xf "testdata/${TFILES}/res.tar" -C "${RESDIR}"
     fi
-    if [ -f testdata/${TFILES}/qdata.tar ]; then
+    if [ -f testdata/"${TFILES}"/qdata.tar ]; then
         tar xf "testdata/${TFILES}/qdata.tar" -C "${QDIR}"
     fi
 }
@@ -223,7 +246,7 @@ startDispatcher() {
 ###############################################################################
 #    INPUT
 ###############################################################################
-while getopts "adt:" o; do
+while getopts "adkt:" o; do
     echo "o = ${o}"
     case "${o}" in
     a)
@@ -233,6 +256,10 @@ while getopts "adt:" o; do
     d)
         DISPATCHEROFF=1
         echo "WILL NOT RUN DISPATCHER IN THIS TEST. YOU MUST RUN SEPARATELY"
+        ;;
+
+    k)  LOADTESTDATAONLY=1
+        echo "LOADING TEST DATA ONLY"
         ;;
     t)
         SINGLETEST="${OPTARG}"
@@ -245,6 +272,12 @@ while getopts "adt:" o; do
     esac
 done
 shift $((OPTIND - 1))
+############################################################################################
+if (( LOADTESTDATAONLY == 1 )); then
+    TFILES="${SINGLETEST}"
+    setupData
+    exit 0
+fi
 ############################################################################################
 
 #------------------------------------------------------------------------------

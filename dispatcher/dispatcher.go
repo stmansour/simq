@@ -221,9 +221,9 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 
 	//----------------------------------------------------------------------------
 	// BUILD THE DESTINATION DIRECTORY
-	// /genome/simulation-results/YYYY/MM/DD/SID/results.tar.gz
+	// /genome/simres/YYYY/MM/DD/SID/results.tar.gz
 	//
-	// for testing: /opt/TestSimResultsRepo
+	// for testing: /opt/testsimres
 	//----------------------------------------------------------------------------
 	now := time.Now()
 	year := now.Year()

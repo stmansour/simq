@@ -24,7 +24,7 @@ echo "+------------------------------------------------------------"
 echo "SELECT * FROM Queue;" | "${MYSQL}" simqtest
 
 echo "+-----------------------------------------------------------"
-echo "|  Resetting /opt/TestSimResultsRepo directory"
+echo "|  Resetting /opt/testsimres directory"
 echo "+------------------------------------------------------------"
 rm -rf "${RESULTSDIR:?}/*"
 

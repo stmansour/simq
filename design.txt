@@ -43,7 +43,7 @@ needs to supply the config file. The dispatcher then archives the
 config file while the simulation is running. Once the simulation
 is completed and the results have been sent to the dispatcher to
 be archived, the dispatcher puts the results in to the simulation
-results repository (/opt/simulation-results) which organizes its
+results repository (/genome/simres) which organizes its
 results in the filesystem by date and Simulation ID (SID) as follows:
 ./YYYY/MM/DD/SID/(result files)
 
