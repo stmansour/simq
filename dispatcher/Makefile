@@ -15,7 +15,7 @@ dispatcher: *.go
 
 clean:
 	go clean
-	rm -rf config.* *.prof *.out qdconfigs extres.json5 fail [a-z][0-9] DISPATCHER.log serverresponse simulations simstats* received_config.json5 finrep*
+	rm -rf config.* *.prof *.out qdconfigs extres.json5 fail [a-z][0-9] DISPATCHER.log serverresponse simulations simstats* received_config.json5 finrep* b.rcvd.config.json5
 	@echo "*** ${THISDIR}: completed clean ***"
 
 test: config

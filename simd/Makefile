@@ -14,7 +14,7 @@ simd: *.go
 
 clean:
 	go clean
-	rm -rf *.prof *.out extres.json5 fail [a-z][0-9] DISPATCHER.log serverresponse config.json5 simulations finrep.csv simstats.csv
+	rm -rf *.prof *.out extres.json5 fail [a-z][0-9] DISPATCHER.log serverresponse config.json5 simulations finrep.csv simstats.csv simd.log simdconf.json5 b.rcvd.config.json5
 	@echo "*** ${THISDIR}: completed clean ***"
 
 test: config
@@ -25,9 +25,9 @@ test: config
 config:
 	@if [ ! -f ./config.json5 ]; then cp /usr/local/plato/bin/config.json5 .;echo "copied config.json5";fi
 	@if [ ! -f ./extres.json5 ]; then cp ~/.vault/extres.json5 .;echo "copied extres.json5";fi
-	@if [ "${MACHINENAME}" = "StevesMcBookPro.attlocal.net" ]; then cp simdconfsman.json5 simdconf.json5; echo "simdconfig set for ${MACHINENAME}"; fi
-	@if [ "${MACHINENAME}" = "plato" ]; then cp simdconfplato.json5 simdconfig.json5; echo "simdconfig set for ${MACHINENAME}"; fi
-	@if [ "${MACHINENAME}" = "Steves-2020-Pro.attlocal.net" ]; then cp simdsmanx86.json5 simdconfig.json5; echo "simdconfig set for ${MACHINENAME}"; fi
+	@if [ "${MACHINENAME}" = "StevesMcBookPro.attlocal.net" ]; then cp simdconfsman.json5 simdconf.json5; echo "simdconf set for ${MACHINENAME}"; fi
+	@if [ "${MACHINENAME}" = "plato" ]; then cp simdconfplato.json5 simdconfig.json5; echo "simdconf set for ${MACHINENAME}"; fi
+	@if [ "${MACHINENAME}" = "Steves-2020-Pro.attlocal.net" ]; then cp simdsmanx86.json5 simdconf.json5; echo "simdconf set for ${MACHINENAME}"; fi
 
 coverage:
 	go tool cover -html=coverage.out 
