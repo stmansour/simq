@@ -55,6 +55,9 @@ func SvcWriteResponse(w http.ResponseWriter, g interface{}) {
 	SvcWrite(w, b)
 }
 
+// findConfigFile finds the config file in the directory
+// and returns the full path of the file
+// -----------------------------------------------------------------------------
 func findConfigFile(configDir string) (string, error) {
 	files, err := os.ReadDir(configDir)
 	if err != nil {

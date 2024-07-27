@@ -3,11 +3,10 @@ RUNSINGLETEST=0
 TESTCOUNT=0
 ERRORCOUNT=0
 DISPATCHER_RUNNING=0
+RESDIR=$(grep "SimResultsDir" dispatcher.json5| sed 's/".*"://' | sed 's/[", ]//g')
+QDIR=$(grep "DispatcherQueueDir" dispatcher.json5| sed 's/".*"://' | sed 's/[", ]//g')
+MYSQL=$(which mysql)
 
-MYSQL=/usr/bin/mysql
-if [ ! -f ${MYSQL} ]; then
-    MYSQL=$(which mysql)
-fi
 echo "MySQL: ${MYSQL}"
 
 usage() {
@@ -172,6 +171,32 @@ compareToGold() {
                 esac
             done
         fi
+    fi
+}
+#------------------------------------------------------------------------------
+# setupData - sets up all directories and database for test $TFILES
+# INPUTS
+#    none yet
+#------------------------------------------------------------------------------
+setupData() {
+    #---------------------------
+    # first clean directories
+    #---------------------------
+    rm -rf "${RESDIR:?}/"*
+    rm -rf "${QDIR:?}/"*
+    #---------------------------
+    # clean database
+    #---------------------------
+    ${MYSQL} simqtest < testdata/${TFILES}/simq.sql
+    # sleep 1
+    #---------------------------
+    # Initialize datafiles
+    #---------------------------
+    if [ -f testdata/${TFILES}/res.tar ]; then
+        tar xvf "testdata/${TFILES}/res.tar" -C "${RESDIR}"
+    fi
+    if [ -f testdata/${TFILES}/qdata.tar ]; then
+        tar xvf "testdata/${TFILES}/qdata.tar" -C "${QDIR}"
     fi
 }
 
@@ -347,6 +372,29 @@ if [[ "${SINGLETEST}${TFILES}" = "${TFILES}" || "${SINGLETEST}${TFILES}" = "${TF
     # Compare output to gold standard
     compareToGold ${RESFILE}
     ((TESTCOUNT++))
+fi
+
+#------------------------------------------------------------------------------
+#  TEST c
+#  redo a simulation
+#------------------------------------------------------------------------------
+TFILES="c"
+STEP=0
+if [[ "${SINGLETEST}${TFILES}" = "${TFILES}" || "${SINGLETEST}${TFILES}" = "${TFILES}${TFILES}" ]]; then
+    setupData
+    startDispatcher
+    echo -n "Test ${TFILES} - Redo a simulation... "
+    #----------------------------------
+    # Redo simulation 5
+    #----------------------------------
+    REDO_CMD='{"command":"Redo","username":"test-user","data":{"SID":5,"MachineID":"test-machine"}}'
+    # echo "Sending Book command: ${REDO_CMD}" 
+    RESPONSE=$(curl -s -X POST -H "Content-Type: application/json" -d "${REDO_CMD}" http://localhost:8250/command)
+    sleep 1  # Ensure the response is fully captured
+    RESFILE="${TFILES}${STEP}"
+    echo "${RESPONSE}" > "${RESFILE}"
+    compareToGold "${RESFILE}"
+
 fi
 
 echo "Total tests: ${TESTCOUNT}"

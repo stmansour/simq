@@ -118,6 +118,7 @@ var handlerTable = map[string]HandlerTableEntry{
 	"NewSimulation":     {Handler: handleNewSimulation},
 	"Priority":          {Handler: handlePriority},
 	"Rebook":            {Handler: handleBook},
+	"Redo":              {Handler: handleRedo},
 	"Shutdown":          {Handler: handleShutdown},
 	"UpdateItem":        {Handler: handleUpdateItem},
 }
