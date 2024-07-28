@@ -3,8 +3,8 @@
 #---------------------------------------
 # RESET SQL DB
 #---------------------------------------
-echo "resetting production simq.Queue table"
-mysql simq <<EOF
+echo "resetting production simqtest.Queue table"
+mysql simqtest <<EOF
 DROP TABLE IF EXISTS Queue;
 CREATE TABLE IF NOT EXISTS Queue (
      SID BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -24,10 +24,10 @@ CREATE TABLE IF NOT EXISTS Queue (
 EOF
 
 #---------------------------------------
-# RESET GENOME    (SIMULATION REPOSITORY)
+# RESET (SIMULATION REPOSITORY)
 #---------------------------------------
-echo "resetting /genome/simres/"
-rm -rf /genome/simres/*
+echo "resetting /opt/testsimres/"
+rm -rf /opt/testsimres/*
 
 #---------------------------------------
 # REMOVE DISPATCHER LOGS & TEMP STORAGE

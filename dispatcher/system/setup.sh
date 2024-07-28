@@ -4,4 +4,4 @@ tar xvf simd.tar -C /var/lib/simd/
 
 MYSQL=$(which mysql)
 echo "MYSQL = ${MYSQL}"
-${MYSQL} simq < simq.sql
+${MYSQL} simqtest < simq.sql

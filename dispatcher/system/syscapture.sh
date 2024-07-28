@@ -17,6 +17,6 @@ mv simd.tar "${CWD}"
 #-------------------------------------
 #  capture simq database...
 #-------------------------------------
-mysqldump simq >simq.sql
+mysqldump simqtest >simq.sql
 
 
