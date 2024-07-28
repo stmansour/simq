@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"mime/multipart"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -27,6 +29,31 @@ type Command struct {
 	Command  string
 	Username string
 	Data     json.RawMessage
+}
+
+// SvcStatus200 is a simple status message return
+type SvcStatus200 struct {
+	Status  string
+	Message string
+}
+
+// BuildURL builds a full URL from a base URL and a relative path
+func BuildURL(baseURL, path string) (string, error) {
+	// Parse the base URL
+	base, err := url.Parse(baseURL)
+	if err != nil {
+		return "", fmt.Errorf("invalid base URL: %v", err)
+	}
+
+	// Parse the relative path
+	ref, err := url.Parse(path)
+	if err != nil {
+		return "", fmt.Errorf("invalid path: %v", err)
+	}
+
+	// Resolve the reference to create the full URL
+	fullURL := base.ResolveReference(ref)
+	return fullURL.String(), nil
 }
 
 // GetNetworkInfo returns a list of network info
@@ -225,4 +252,32 @@ func ScanPorts(startPort, endPort int) []int {
 		}
 	}
 	return openPorts
+}
+
+// SvcErrorReturn formats an error return to the grid widget and sends it
+func SvcErrorReturn(w http.ResponseWriter, err error) {
+	log.Printf("%v\n", err)
+	var e SvcStatus200
+	e.Status = "error"
+	e.Message = err.Error()
+	w.Header().Set("Content-Type", "application/json")
+	b, _ := json.Marshal(e)
+	SvcWrite(w, b)
+}
+
+// SvcWriteResponse finishes the transaction with the W2UI client
+func SvcWriteResponse(w http.ResponseWriter, g interface{}) {
+	w.Header().Set("Content-Type", "application/json") // we're marshaling the data as json
+	b, err := json.Marshal(g)
+	if err != nil {
+		SvcErrorReturn(w, fmt.Errorf("error marshaling json data: %s", err.Error()))
+		return
+	}
+	SvcWrite(w, b)
+}
+
+// SvcWrite is a general write routine for service calls... it is a bottleneck
+// where we can place debug statements as needed.
+func SvcWrite(w http.ResponseWriter, b []byte) {
+	w.Write(b)
 }

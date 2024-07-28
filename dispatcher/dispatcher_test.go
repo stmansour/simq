@@ -94,7 +94,7 @@ func TestHandleShutdown(t *testing.T) {
 		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
 	}
 
-	var resp SvcStatus200
+	var resp util.SvcStatus200
 	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
 		t.Errorf("Failed to unmarshal response: %v", err)
 	}

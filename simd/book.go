@@ -51,7 +51,11 @@ func bookAndRunSimulation(bkcmd string, sid int64) error {
 	}
 	machineID, err = util.GetMachineUUID()
 	if err != nil {
-		return fmt.Errorf("failed to get machine ID: %v", err)
+		return fmt.Errorf("bookAndRunSimulation: failed to get machine ID: %v", err)
+	}
+
+	if app.Paused {
+		return fmt.Errorf("bookAndRunSimulation: booking is paused")
 	}
 
 	if bkcmd == "Book" {
@@ -70,7 +74,7 @@ func bookAndRunSimulation(bkcmd string, sid int64) error {
 		}
 		dataBytes, err = json.Marshal(cmdDataStruct)
 		if err != nil {
-			return fmt.Errorf("failed to marshal book request: %v", err)
+			return fmt.Errorf("bookAndRunSimulation: failed to marshal book request: %v", err)
 		}
 	} else if bkcmd == "Rebook" {
 		cmdDataStruct := struct {
@@ -82,13 +86,13 @@ func bookAndRunSimulation(bkcmd string, sid int64) error {
 		}
 		dataBytes, err = json.Marshal(cmdDataStruct)
 		if err != nil {
-			return fmt.Errorf("failed to marshal book request: %v", err)
+			return fmt.Errorf("bookAndRunSimulation: failed to marshal book request: %v", err)
 		}
 	}
 	cmd.Data = json.RawMessage(dataBytes)
 	bookData, err := json.Marshal(cmd)
 	if err != nil {
-		return fmt.Errorf("failed to marshal book request: %v", err)
+		return fmt.Errorf("bookAndRunSimulation: failed to marshal book request: %v", err)
 	}
 
 	if app.HTTPHdrsDbg {
@@ -100,7 +104,7 @@ func bookAndRunSimulation(bkcmd string, sid int64) error {
 	//----------------------------------------
 	req, err := http.NewRequest("POST", app.cfg.FQDispatcherURL, bytes.NewBuffer(bookData))
 	if err != nil {
-		return fmt.Errorf("failed to create request: %v", err)
+		return fmt.Errorf("bookAndRunSimulation: failed to create request: %v", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 
@@ -120,7 +124,7 @@ func bookAndRunSimulation(bkcmd string, sid int64) error {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to send book request: %v", err)
+		return fmt.Errorf("bookAndRunSimulation: failed to send book request: %v", err)
 	}
 	defer resp.Body.Close()
 
@@ -146,7 +150,7 @@ func bookAndRunSimulation(bkcmd string, sid int64) error {
 		PrintHexAndASCII(bodyBytes, len(bodyBytes))
 	}
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status code: %v, body: %s", resp.StatusCode, string(bodyBytes))
+		return fmt.Errorf("bookAndRunSimulation: unexpected status code: %v, body: %s", resp.StatusCode, string(bodyBytes))
 	}
 
 	//-----------------------------------------------------------
@@ -174,13 +178,13 @@ func bookAndRunSimulation(bkcmd string, sid int64) error {
 				break
 			}
 			if err != nil {
-				return fmt.Errorf("error reading multipart response: %v", err) // Debugging
+				return fmt.Errorf("bookAndRunSimulation: error reading multipart response: %v", err) // Debugging
 			}
 
 			switch part.FormName() {
 			case "json":
 				if err := json.NewDecoder(part).Decode(&bookResp); err != nil {
-					return fmt.Errorf("failed to unmarshal book response: %v", err)
+					return fmt.Errorf("bookAndRunSimulation: failed to unmarshal book response: %v", err)
 				}
 			case "file":
 				configDir := filepath.Join(app.cfg.SimdSimulationsDir, "simulations", fmt.Sprintf("%d", bookResp.SID))
@@ -190,11 +194,11 @@ func bookAndRunSimulation(bkcmd string, sid int64) error {
 
 				out, err := os.Create(FQConfigFileName)
 				if err != nil {
-					return fmt.Errorf("failed to create config file: %v", err)
+					return fmt.Errorf("bookAndRunSimulation: failed to create config file: %v", err)
 				}
 				defer out.Close()
 				if _, err := io.Copy(out, part); err != nil {
-					return fmt.Errorf("failed to write config file: %v", err)
+					return fmt.Errorf("bookAndRunSimulation: failed to write config file: %v", err)
 				}
 				log.Printf("BOOK CMD: config file written: %s\n", FQConfigFileName)
 			}
@@ -209,17 +213,17 @@ func bookAndRunSimulation(bkcmd string, sid int64) error {
 			Message string
 		}
 		if err := json.Unmarshal(bodyBytes, &respMessage); err != nil {
-			return fmt.Errorf(">>>> failed to unmarshal response: %v", err)
+			return fmt.Errorf(">>>> bookAndRunSimulation: failed to unmarshal response: %v", err)
 		}
 		if respMessage.Message == "no items in queue" {
-			log.Printf(">>>> dispatcher has no items in the queue\n")
+			log.Printf(">>>> bookAndRunSimulation: dispatcher has no items in the queue\n")
 			return nil // This is an expected response
 		} else if respMessage.Status != "success" {
 			if strings.Contains(respMessage.Message, "no items in queue") {
-				log.Printf(">>>> dispatcher has no items in the queue\n")
+				log.Printf(">>>> bookAndRunSimulation: dispatcher has no items in the queue\n")
 				return nil
 			}
-			log.Printf("**** ERROR **** Failed to book simulation: %s", respMessage.Message)
+			log.Printf("**** ERROR **** bookAndRunSimulation: Failed to book simulation: %s", respMessage.Message)
 		}
 	}
 

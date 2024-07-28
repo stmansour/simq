@@ -142,7 +142,7 @@ func commandDispatcher(w http.ResponseWriter, r *http.Request) {
 	//-------------------------------
 	contentType := r.Header.Get("Content-Type")
 	if contentType == "" {
-		SvcErrorReturn(w, fmt.Errorf("commandDispatcher: missing Content-Type header in request"))
+		util.SvcErrorReturn(w, fmt.Errorf("commandDispatcher: missing Content-Type header in request"))
 		return
 	}
 
@@ -151,27 +151,27 @@ func commandDispatcher(w http.ResponseWriter, r *http.Request) {
 	//--------------------------------------------
 	if strings.Contains(contentType, "multipart/form-data") {
 		if err := r.ParseMultipartForm(10 << 20); err != nil {
-			SvcErrorReturn(w, fmt.Errorf("commandDispatcher: failed to parse multipart form: %v", err))
+			util.SvcErrorReturn(w, fmt.Errorf("commandDispatcher: failed to parse multipart form: %v", err))
 			return
 		}
 		dataField := r.FormValue("data") // Extract the data part
 		if dataField == "" {
-			SvcErrorReturn(w, fmt.Errorf("commandDispatcher: missing data field in multipart request"))
+			util.SvcErrorReturn(w, fmt.Errorf("commandDispatcher: missing data field in multipart request"))
 			return
 		}
 		d.BodyBytes = []byte(dataField)
 		if err := json.Unmarshal([]byte(dataField), &cmd); err != nil {
-			SvcErrorReturn(w, fmt.Errorf("commandDispatcher: invalid data payload in multipart request: %v", err))
+			util.SvcErrorReturn(w, fmt.Errorf("commandDispatcher: invalid data payload in multipart request: %v", err))
 			return
 		}
 	} else {
 		bodyBytes, err := io.ReadAll(r.Body) // Single-part request - unmarshal directly
 		if err != nil {
-			SvcErrorReturn(w, fmt.Errorf("commandDispatcher: failed to read request body: %v", err))
+			util.SvcErrorReturn(w, fmt.Errorf("commandDispatcher: failed to read request body: %v", err))
 			return
 		}
 		if err := json.Unmarshal(bodyBytes, &cmd); err != nil {
-			SvcErrorReturn(w, fmt.Errorf("commandDispatcher: invalid request payload: %v", err))
+			util.SvcErrorReturn(w, fmt.Errorf("commandDispatcher: invalid request payload: %v", err))
 			return
 		}
 
@@ -213,7 +213,7 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	var cmd EndSimulationRequest
 
 	if err := json.Unmarshal(d.BodyBytes, &cmd); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: invalid end simulation request data"))
+		util.SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: invalid end simulation request data"))
 		return
 	}
 
@@ -241,7 +241,7 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	// DO ALL THE FILE I/O IN A THREAD-SAFE FUNCTION...
 	//--------------------------------------------------------
 	if err := threadSafeFileIOEndSim(dirPath, filename, r); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: error from threadSafeFileIOForBook: %s", err.Error()))
+		util.SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: error from threadSafeFileIOForBook: %s", err.Error()))
 		return
 	}
 
@@ -251,9 +251,9 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	queueItem, err := app.qm.GetItemByID(cmd.SID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: queue item %d not found", cmd.SID))
+			util.SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: queue item %d not found", cmd.SID))
 		} else {
-			SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: error in GetItemByID: %v", err))
+			util.SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: error in GetItemByID: %v", err))
 		}
 		return
 	}
@@ -261,7 +261,7 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	queueItem.State = data.StateResultsSaved
 
 	if err := app.qm.UpdateItem(queueItem); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: error in UpdateItem: %v", err))
+		util.SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: error in UpdateItem: %v", err))
 		return
 	}
 
@@ -271,7 +271,7 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	configDir := filepath.Join(app.QdConfigsDir, fmt.Sprintf("%d", queueItem.SID))
 	log.Printf("handleEndSimulation: removing config directory %s\n", configDir)
 	if err := threadSafeRemoveAll(configDir); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: error in removing %s: %v", configDir, err))
+		util.SvcErrorReturn(w, fmt.Errorf("handleEndSimulation: error in removing %s: %v", configDir, err))
 		return
 	}
 	log.Printf("handleEndSimulation: sucussfully removed %s\n", configDir)
@@ -287,7 +287,7 @@ func handleEndSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 		Status:  "success",
 		Message: "Results stored in: " + dirPath,
 	}
-	SvcWriteResponse(w, &resp)
+	util.SvcWriteResponse(w, &resp)
 	log.Printf("*** handleEndSimulation:  SUCCESSFUL ***\n")
 }
 
@@ -304,7 +304,7 @@ func handleBook(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	switch d.cmd.Command {
 	case "Book":
 		if err := json.Unmarshal(d.cmd.Data, &bookingRequest); err != nil {
-			SvcErrorReturn(w, fmt.Errorf("handleBook: invalid booking request data"))
+			util.SvcErrorReturn(w, fmt.Errorf("handleBook: invalid booking request data"))
 			return
 		}
 		//---------------------------------------------------
@@ -319,28 +319,28 @@ func handleBook(w http.ResponseWriter, r *http.Request, d *HInfo) {
 					ID:      0,
 				}
 				w.WriteHeader(http.StatusOK)
-				SvcWriteResponse(w, &msg)
+				util.SvcWriteResponse(w, &msg)
 				return
 			}
-			SvcErrorReturn(w, fmt.Errorf("handleBook: err: %s", err.Error()))
+			util.SvcErrorReturn(w, fmt.Errorf("handleBook: err: %s", err.Error()))
 			return
 		}
 	case "Rebook":
 		log.Printf("handling Rebook command\n")
 		if err := json.Unmarshal(d.cmd.Data, &rebookRequest); err != nil {
-			SvcErrorReturn(w, fmt.Errorf("handleBook: invalid rebook request data"))
+			util.SvcErrorReturn(w, fmt.Errorf("handleBook: invalid rebook request data"))
 			return
 		}
 		queueItem, err = app.qm.GetItemByID(rebookRequest.SID)
 		if err != nil {
-			SvcErrorReturn(w, fmt.Errorf("handleBook: err: %s", err.Error()))
+			util.SvcErrorReturn(w, fmt.Errorf("handleBook: err: %s", err.Error()))
 			return
 		}
 		if queueItem.MachineID != rebookRequest.MachineID {
 			log.Printf("*** WARNING *** Granted MachineID %s rebooking for SID %d originally assigned to MachineID %s", rebookRequest.MachineID, rebookRequest.SID, queueItem.MachineID)
 		}
 	default:
-		SvcErrorReturn(w, fmt.Errorf("handleBook: invalid command"))
+		util.SvcErrorReturn(w, fmt.Errorf("handleBook: invalid command"))
 		return
 	}
 
@@ -352,7 +352,7 @@ func handleBook(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	configDir := filepath.Join(app.QdConfigsDir, fmt.Sprintf("%d", queueItem.SID))
 	configFilename, err := findConfigFile(configDir)
 	if err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleBook: error finding config file: %s", err.Error()))
+		util.SvcErrorReturn(w, fmt.Errorf("handleBook: error finding config file: %s", err.Error()))
 		return
 	}
 
@@ -373,11 +373,11 @@ func handleBook(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	//-------------------------
 	jsonWriter, err := multipartWriter.CreateFormField("json")
 	if err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleBook: failed to create JSON part"))
+		util.SvcErrorReturn(w, fmt.Errorf("handleBook: failed to create JSON part"))
 		return
 	}
 	if err := json.NewEncoder(jsonWriter).Encode(response); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleBook: failed to encode JSON response"))
+		util.SvcErrorReturn(w, fmt.Errorf("handleBook: failed to encode JSON response"))
 		return
 	}
 
@@ -387,18 +387,18 @@ func handleBook(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	configFilePath := filepath.Join(app.QdConfigsDir, fmt.Sprintf("%d", queueItem.SID), response.ConfigFilename)
 	configFile, err := os.Open(configFilePath)
 	if err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleBook: failed to open config file"))
+		util.SvcErrorReturn(w, fmt.Errorf("handleBook: failed to open config file"))
 		return
 	}
 	defer configFile.Close()
 
 	fileWriter, err := multipartWriter.CreateFormFile("file", response.ConfigFilename)
 	if err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleBook: failed to create file part"))
+		util.SvcErrorReturn(w, fmt.Errorf("handleBook: failed to create file part"))
 		return
 	}
 	if _, err := io.Copy(fileWriter, configFile); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleBook: failed to send config file"))
+		util.SvcErrorReturn(w, fmt.Errorf("handleBook: failed to send config file"))
 		return
 	}
 
@@ -406,7 +406,7 @@ func handleBook(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	// Close the multipart writer
 	//----------------------------
 	if err := multipartWriter.Close(); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleBook: failed to close multipart writer"))
+		util.SvcErrorReturn(w, fmt.Errorf("handleBook: failed to close multipart writer"))
 		return
 	}
 
@@ -420,7 +420,7 @@ func handleBook(w http.ResponseWriter, r *http.Request, d *HInfo) {
 		queueItem.MachineID = bookingRequest.MachineID
 	}
 	if err := app.qm.UpdateItem(queueItem); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleBook: failed to update queue item"))
+		util.SvcErrorReturn(w, fmt.Errorf("handleBook: failed to update queue item"))
 		return
 	}
 	log.Printf("*** handleBook:  SUCCESSFUL ***\n")
@@ -438,7 +438,7 @@ func handleNewSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	//-----------------------------------------------------------
 	var req CreateQueueEntryRequest
 	if err := json.Unmarshal(d.cmd.Data, &req); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleNewSimulation: failed to unmarshal request data"))
+		util.SvcErrorReturn(w, fmt.Errorf("handleNewSimulation: failed to unmarshal request data"))
 		return
 	}
 
@@ -447,13 +447,13 @@ func handleNewSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	//------------------------------
 	file, _, err := r.FormFile("file")
 	if err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleNewSimulation: failed to get file from form"))
+		util.SvcErrorReturn(w, fmt.Errorf("handleNewSimulation: failed to get file from form"))
 		return
 	}
 	defer file.Close()
 	fileContent, err := io.ReadAll(file)
 	if err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleNewSimulation: failed to read file content"))
+		util.SvcErrorReturn(w, fmt.Errorf("handleNewSimulation: failed to read file content"))
 		return
 	}
 
@@ -472,7 +472,7 @@ func handleNewSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 
 	var sid int64
 	if sid, err = threadSafeNewSim(fileContent, &queueItem, &req); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleNewSimulation: %s", err.Error()))
+		util.SvcErrorReturn(w, fmt.Errorf("handleNewSimulation: %s", err.Error()))
 		return
 	}
 	//--------------------
@@ -484,18 +484,18 @@ func handleNewSimulation(w http.ResponseWriter, r *http.Request, d *HInfo) {
 		ID:      sid,
 	}
 	w.WriteHeader(http.StatusCreated)
-	SvcWriteResponse(w, &msg)
+	util.SvcWriteResponse(w, &msg)
 	log.Printf("*** handleNewSimulation:  SUCCESSFUL ***\n")
 }
 
 // handleShutdown handles the Shutdown command
 func handleShutdown(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	log.Printf("*** entered: handleShutdown\n")
-	resp := SvcStatus200{
+	resp := util.SvcStatus200{
 		Status:  "success",
 		Message: "Shutting down",
 	}
-	SvcWriteResponse(w, &resp)
+	util.SvcWriteResponse(w, &resp)
 	go func() {
 		time.Sleep(1 * time.Second) // Give the response time to be sent
 		app.quit <- os.Interrupt    // Signal the quit channel to initiate shutdown
@@ -508,7 +508,7 @@ func handleGetActiveQueue(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	log.Printf("*** entered: handleGetActiveQueue\n")
 	items, err := app.qm.GetQueuedAndExecutingItems()
 	if err != nil {
-		SvcErrorReturn(w, fmt.Errorf("failed to get active queue items"))
+		util.SvcErrorReturn(w, fmt.Errorf("failed to get active queue items"))
 		return
 	}
 
@@ -520,7 +520,7 @@ func handleGetActiveQueue(w http.ResponseWriter, r *http.Request, d *HInfo) {
 		Status: "success",
 		Data:   items,
 	}
-	SvcWriteResponse(w, &resp)
+	util.SvcWriteResponse(w, &resp)
 }
 
 // handleGetMachineQueue returns the queue of all incomplete items for the
@@ -533,12 +533,12 @@ func handleGetMachineQueue(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	//-----------------------------------------------------------
 	var req MachineQueueRequest
 	if err := json.Unmarshal(d.cmd.Data, &req); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("failed to unmarshal request data"))
+		util.SvcErrorReturn(w, fmt.Errorf("failed to unmarshal request data"))
 		return
 	}
 	items, err := app.qm.GetIncompleteItemsByMachineID(req.MachineID)
 	if err != nil {
-		SvcErrorReturn(w, fmt.Errorf("failed to get incomplete queue items for machine %s, error: %v", req.MachineID, err))
+		util.SvcErrorReturn(w, fmt.Errorf("failed to get incomplete queue items for machine %s, error: %v", req.MachineID, err))
 		return
 	}
 
@@ -550,7 +550,7 @@ func handleGetMachineQueue(w http.ResponseWriter, r *http.Request, d *HInfo) {
 		Status: "success",
 		Data:   items,
 	}
-	SvcWriteResponse(w, &resp)
+	util.SvcWriteResponse(w, &resp)
 }
 
 // handleGetSID handles the GetCompletedQueue command
@@ -564,13 +564,13 @@ func handleGetSID(w http.ResponseWriter, r *http.Request, d *HInfo) {
 
 	var req GetSIDRequest
 	if err := json.Unmarshal(d.cmd.Data, &req); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("failed to unmarshal request data"))
+		util.SvcErrorReturn(w, fmt.Errorf("failed to unmarshal request data"))
 		return
 	}
 
 	item, err := app.qm.GetItemByID(req.SID)
 	if err != nil {
-		SvcErrorReturn(w, fmt.Errorf("failed to get completed queue item"))
+		util.SvcErrorReturn(w, fmt.Errorf("failed to get completed queue item"))
 		return
 	}
 
@@ -582,7 +582,7 @@ func handleGetSID(w http.ResponseWriter, r *http.Request, d *HInfo) {
 		Status: "success",
 		Data:   item,
 	}
-	SvcWriteResponse(w, &resp)
+	util.SvcWriteResponse(w, &resp)
 }
 
 // handleGetCompletedQueue handles the GetCompletedQueue command
@@ -591,7 +591,7 @@ func handleGetCompletedQueue(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	log.Printf("*** entered: handleGetCompletedQueue\n")
 	items, err := app.qm.GetCompletedItems()
 	if err != nil {
-		SvcErrorReturn(w, fmt.Errorf("failed to get active queue items"))
+		util.SvcErrorReturn(w, fmt.Errorf("failed to get active queue items"))
 		return
 	}
 
@@ -603,7 +603,7 @@ func handleGetCompletedQueue(w http.ResponseWriter, r *http.Request, d *HInfo) {
 		Status: "success",
 		Data:   items,
 	}
-	SvcWriteResponse(w, &resp)
+	util.SvcWriteResponse(w, &resp)
 }
 
 // handlePriorty handles sets the priority of the supplied sid
@@ -618,7 +618,7 @@ func handlePriority(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	// only set the fields supplied by the caller...
 	//--------------------------------------------------------
 	if err := json.Unmarshal(d.cmd.Data, &req); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleUpdateItem: invalid request data"))
+		util.SvcErrorReturn(w, fmt.Errorf("handleUpdateItem: invalid request data"))
 		return
 	}
 
@@ -628,14 +628,14 @@ func handlePriority(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	queueItem, err := app.qm.GetItemByID(req.SID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			SvcErrorReturn(w, fmt.Errorf("handleUpdateItem: queue item %d not found", req.SID))
+			util.SvcErrorReturn(w, fmt.Errorf("handleUpdateItem: queue item %d not found", req.SID))
 		} else {
-			SvcErrorReturn(w, fmt.Errorf("handleUpdateItem: error in GetItemByID: %v", err))
+			util.SvcErrorReturn(w, fmt.Errorf("handleUpdateItem: error in GetItemByID: %v", err))
 		}
 		return
 	}
 	if req.Priority < 0 {
-		SvcErrorReturn(w, fmt.Errorf("handleUpdateItem: invalid priority: %d", req.Priority))
+		util.SvcErrorReturn(w, fmt.Errorf("handleUpdateItem: invalid priority: %d", req.Priority))
 		return
 	}
 	//--------------------------------------------------------
@@ -643,7 +643,7 @@ func handlePriority(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	//--------------------------------------------------------
 	queueItem.Priority = req.Priority
 	if err := app.qm.UpdateItem(queueItem); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleUpdateItem: failed to update queue item"))
+		util.SvcErrorReturn(w, fmt.Errorf("handleUpdateItem: failed to update queue item"))
 		return
 	}
 
@@ -653,7 +653,7 @@ func handlePriority(w http.ResponseWriter, r *http.Request, d *HInfo) {
 		Message: "Updated",
 		ID:      queueItem.SID,
 	}
-	SvcWriteResponse(w, &msg)
+	util.SvcWriteResponse(w, &msg)
 }
 
 // handleUpdateItem handles the UpdateItem command
@@ -681,7 +681,7 @@ func handleUpdateItem(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	// only set the fields supplied by the caller...
 	//--------------------------------------------------------
 	if err := json.Unmarshal(d.cmd.Data, &req); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleUpdateItem: invalid request data"))
+		util.SvcErrorReturn(w, fmt.Errorf("handleUpdateItem: invalid request data"))
 		return
 	}
 
@@ -691,9 +691,9 @@ func handleUpdateItem(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	queueItem, err := app.qm.GetItemByID(req.SID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			SvcErrorReturn(w, fmt.Errorf("handleUpdateItem: queue item %d not found", req.SID))
+			util.SvcErrorReturn(w, fmt.Errorf("handleUpdateItem: queue item %d not found", req.SID))
 		} else {
-			SvcErrorReturn(w, fmt.Errorf("handleUpdateItem: error in GetItemByID: %v", err))
+			util.SvcErrorReturn(w, fmt.Errorf("handleUpdateItem: error in GetItemByID: %v", err))
 		}
 		return
 	}
@@ -717,7 +717,7 @@ func handleUpdateItem(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	if req.DtEstimate != z && len(req.DtEstimate) > 0 {
 		dt, err := util.StringToDate(req.DtEstimate)
 		if err != nil {
-			SvcErrorReturn(w, fmt.Errorf("handleUpdateItem: invalid date: %s", req.DtEstimate))
+			util.SvcErrorReturn(w, fmt.Errorf("handleUpdateItem: invalid date: %s", req.DtEstimate))
 			return
 		}
 		queueItem.DtEstimate.Time = dt
@@ -727,7 +727,7 @@ func handleUpdateItem(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	if req.DtCompleted != z && len(req.DtCompleted) > 0 {
 		dt, err := util.StringToDate(req.DtCompleted)
 		if err != nil {
-			SvcErrorReturn(w, fmt.Errorf("handleUpdateItem: invalid date: %s", req.DtCompleted))
+			util.SvcErrorReturn(w, fmt.Errorf("handleUpdateItem: invalid date: %s", req.DtCompleted))
 			return
 		}
 		queueItem.DtCompleted.Time = dt
@@ -736,7 +736,7 @@ func handleUpdateItem(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	}
 
 	if err := app.qm.UpdateItem(queueItem); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleUpdateItem: failed to update queue item"))
+		util.SvcErrorReturn(w, fmt.Errorf("handleUpdateItem: failed to update queue item"))
 		return
 	}
 
@@ -746,7 +746,7 @@ func handleUpdateItem(w http.ResponseWriter, r *http.Request, d *HInfo) {
 		Message: "Updated",
 		ID:      queueItem.SID,
 	}
-	SvcWriteResponse(w, &msg)
+	util.SvcWriteResponse(w, &msg)
 }
 
 // handleDeleteItem handles the DeleteItem command
@@ -755,27 +755,27 @@ func handleDeleteItem(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	log.Printf("*** entered: handleDeleteItem\n")
 	var req DeleteItemRequest
 	if err := json.Unmarshal(d.cmd.Data, &req); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("invalid request data"))
+		util.SvcErrorReturn(w, fmt.Errorf("invalid request data"))
 		return
 	}
 
 	// Retrieve the queue item to get the associated file path
 	_, err := app.qm.GetItemByID(req.SID)
 	if err != nil {
-		SvcErrorReturn(w, fmt.Errorf("item not found"))
+		util.SvcErrorReturn(w, fmt.Errorf("item not found"))
 		return
 	}
 
 	// Delete the file and directory associated with the queue item
 	dirPath := filepath.Join(app.QdConfigsDir, fmt.Sprintf("%d", req.SID))
 	if err := threadSafeRemoveAll(dirPath); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("failed to remove directory %s: %v", dirPath, err))
+		util.SvcErrorReturn(w, fmt.Errorf("failed to remove directory %s: %v", dirPath, err))
 		return
 	}
 
 	// Delete the queue item from the database
 	if err := app.qm.DeleteItem(req.SID); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("failed to delete queue item %d: %v", req.SID, err))
+		util.SvcErrorReturn(w, fmt.Errorf("failed to delete queue item %d: %v", req.SID, err))
 		return
 	}
 
@@ -785,5 +785,5 @@ func handleDeleteItem(w http.ResponseWriter, r *http.Request, d *HInfo) {
 		Message: "deleted",
 		ID:      req.SID,
 	}
-	SvcWriteResponse(w, &msg)
+	util.SvcWriteResponse(w, &msg)
 }

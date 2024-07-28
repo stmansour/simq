@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"net/url"
 	"os"
 	"path"
@@ -53,6 +54,7 @@ type SimulatorStatus struct {
 
 var app struct {
 	cfg         SimdConfig   // configuration of this machine
+	listenPort  int          // port to listen on 8251 by default
 	sims        []Simulation // currently running simulations
 	simsMu      sync.Mutex   // mutex for updating sims
 	HexASCIIDbg bool         // if true print reply buffers in hex and ASCII
@@ -60,11 +62,14 @@ var app struct {
 	version     bool         // program version string
 	simdHomeDir string       // home directory - typically /usr/local/simq/simd
 	mutex       sync.Mutex   // mutex for creating the tar.gz file
+	DtStart     time.Time    // start time of the program
+	Paused      bool         // when true, do not book any more simulations
 }
 
 func readCommandLineArgs() {
 	flag.BoolVar(&app.HexASCIIDbg, "D", false, "Turn on debug mode")
 	flag.BoolVar(&app.version, "v", false, "Print the program version string")
+	flag.BoolVar(&app.Paused, "p", false, "When present, start simd in paused mode (don't book any simulations)")
 	flag.Parse()
 }
 
@@ -79,6 +84,9 @@ func main() {
 		log.Fatalf("Failed to get executable directory: %v", err)
 	}
 
+	app.listenPort = 8251
+	app.Paused = false // this is the default, but I want to be very explicit about this
+
 	fname := filepath.Join(app.simdHomeDir, "simd.log")
 	logFile, err := os.OpenFile(fname, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
@@ -88,7 +96,8 @@ func main() {
 	log.SetOutput(logFile)
 	log.Printf("----------------------------------------------------------------\n")
 	log.Printf("simd version: %s\n", util.Version())
-	log.Printf("Initiated: %s\n", time.Now().Format(time.RFC3339))
+	app.DtStart = time.Now()
+	log.Printf("Initiated: %s\n", app.DtStart.Format(time.RFC3339))
 
 	app.sims = make([]Simulation, 0) // initialize it empty
 
@@ -128,6 +137,21 @@ func main() {
 	log.Printf("simd network address: %s\n", app.cfg.SimdURL)
 
 	//-------------------------------------
+	// SETUP THE HTTP LISTENER
+	//-------------------------------------
+	go func() {
+		http.HandleFunc("/PauseBooking", PauseBookingHandler)
+		http.HandleFunc("/Shutdown", ShutdownHandler)
+		http.HandleFunc("/Status", StatusHandler)
+		http.HandleFunc("/CheckUpdates", CheckUpdatesHandler)
+
+		log.Printf("Starting SIMD HTTP listener on port %d\n", app.listenPort)
+		if err := http.ListenAndServe(fmt.Sprintf(":%d", app.listenPort), nil); err != nil {
+			log.Fatalf("Failed to start server: %v", err)
+		}
+	}()
+
+	//-------------------------------------
 	// SETUP THE DISPATCHER URL
 	//-------------------------------------
 	parsedURL, err := url.Parse(app.cfg.DispatcherURL)
@@ -145,6 +169,12 @@ func main() {
 	dirPath := filepath.Join(app.cfg.SimdSimulationsDir, "simulations")
 	if err = os.MkdirAll(dirPath, os.ModePerm); err != nil {
 		log.Fatalf("Failed to create %s directory: %v", dirPath, err)
+	}
+
+	if app.Paused {
+		log.Printf("Starting in paused mode. Will not book or recover simulations until pause is removed\n")
+	} else {
+		log.Printf("Started in normal mode.Will book new simulations to book\n")
 	}
 
 	//-----------------------------------------------------
@@ -183,6 +213,7 @@ func main() {
 }
 
 // Load configuration from JSON5 file
+// ------------------------------------------------------------------------------
 func loadConfig(file string, config *SimdConfig) error {
 	content, err := os.ReadFile(file)
 	if err != nil {
@@ -200,10 +231,11 @@ func loadConfig(file string, config *SimdConfig) error {
 }
 
 // Check if simd is available to run simulations
+// ------------------------------------------------------------------------------
 func isAvailable() bool {
 	//-------------------------------------
 	// Can we run any more simulations?
 	// trivial implementation for now...
 	//-------------------------------------
-	return len(app.sims) < app.cfg.MaxSimulations
+	return len(app.sims) < app.cfg.MaxSimulations && !app.Paused
 }

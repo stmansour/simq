@@ -38,6 +38,7 @@ var app struct {
 	DispatcherHost string
 	cwd            string
 	version        bool
+	SimdURL        string
 }
 
 // Commands represents the list of commands
@@ -51,10 +52,12 @@ func init() {
 		{Command: "d|done", ArgCount: 0, Handler: listDoneJobs, Help: "List completed simulations"},
 		{Command: "e|exit|q|quit", ArgCount: 0, Handler: handleExit, Help: "Exit the program"},
 		{Command: "help|?", ArgCount: 0, Handler: handleHelp, Help: "Show this help message"},
+		{Command: "i|info", ArgCount: 0, Handler: handleInfo, Help: "Show psq's internal settings"},
 		{Command: "l|list", ArgCount: 0, Handler: listJobs, Help: "List pending simulations"},
 		{Command: "p|pri|priority", ArgCount: 2, Handler: setPriority, Help: "priority <sid> <priority> - set the priority for <sid> to <priority>"},
 		{Command: "q|quit", ArgCount: 0, Handler: handleExit, Help: "Exit the program"},
 		{Command: "r|redo", ArgCount: 1, Handler: handleRedo, Help: "redo <sid> - redo simulation <sid>"},
+		{Command: "ss|s-status|simd-status", ArgCount: 0, Handler: GetSimdStatus, Help: "contact simd and show its status"},
 		{Command: "sid", ArgCount: 1, Handler: getSID, Help: "sid <sid> - list details for a simulation ID. Also works with just <sid>."},
 	}
 }
@@ -62,6 +65,7 @@ func init() {
 func main() {
 	var err error
 	app.DispatcherHost = "http://216.16.195.147:8250/" // default dispatcher URL is on plato server
+	app.SimdURL = "http://localhost:8251/"             // default simd URL is on plato server
 	app.cwd, err = os.Getwd()
 	if err != nil {
 		log.Fatalf("Failed to get current working directory: %v", err)
@@ -240,4 +244,11 @@ func JoinURL(base string, endpoint string) (string, error) {
 	baseURL.Path = path.Join(baseURL.Path, endpoint)
 
 	return baseURL.String(), nil
+}
+
+// handleInfo displays info about this running psq instance
+func handleInfo(cmd *CmdData, args []string) {
+	fmt.Printf("       PSQ version: %s\n", util.Version())
+	fmt.Printf("dispatcher address: %s\n", app.DispatcherHost)
+	fmt.Printf("      simd address: %s\n", app.SimdURL)
 }

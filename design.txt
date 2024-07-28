@@ -184,3 +184,45 @@ Analysis Of Simulation Reports
 This is a topic for a different capability of the PLATO system.
 SIMQ will not be responsible for analyzing any of the simulation
 reports.
+
+Appendix A.  simd HTTP Listener
+
+Shortly after putting the simq system into production it became clear
+that we needed to communicate with a running simd for a variety of
+things. Probably most important was the need to tell it to stop
+booking new simulations so that a new version of the simulator
+could be released. Another big reason is to automate the update of
+the code itself. But there were other reasons as well.  In fact,
+here is the proposed command set for the first implementation of the
+simd listener:
+
+1.	PauseBooking:
+	•	Endpoint: /PauseBooking
+	•	Method: POST
+	•	Description: Pauses the acceptance of new simulations,
+        allowing ongoing simulations to complete without starting
+        new ones. This prepares the system for updates or maintenance.
+	•	Parameters: None.
+2.	Shutdown:
+	•	Endpoint: /Shutdown
+	•	Method: POST
+	•	Description: Initiates a graceful shutdown of simd after
+        completing all running simulations, ensuring that results
+        are saved and reported.
+	•	Parameters: Optional timeout parameter to enforce shutdown
+        after a specific duration.
+3.	Status:
+	•	Endpoint: /Status
+	•	Method: GET
+	•	Description: Provides the current status of simd, including
+        details on running simulations, queued simulations, and
+        system health.
+	•	Parameters: None.
+4.	CheckUpdates:
+	•	Endpoint: /CheckUpdates
+	•	Method: GET
+	•	Description: Checks for available updates for the simulator,
+        facilitating remote updates. This command can integrate with
+        version control or deployment systems.
+	•	Parameters: None.
+

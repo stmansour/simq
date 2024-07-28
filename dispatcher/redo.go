@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/stmansour/simq/data"
+	"github.com/stmansour/simq/util"
 )
 
 // Redo Simulation represents the data for redoing a simulation.
@@ -40,13 +41,13 @@ func handleRedo(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	var rebookRequest SimulationRebookRequest
 	log.Printf("handling REDO command\n")
 	if err := json.Unmarshal(d.cmd.Data, &rebookRequest); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleRedo: invalid rebook request data"))
+		util.SvcErrorReturn(w, fmt.Errorf("handleRedo: invalid rebook request data"))
 		return
 	}
 	log.Printf("handleRedo: SID %d, MachineID %s\n", rebookRequest.SID, rebookRequest.MachineID)
 	queueItem, err = app.qm.GetItemByID(rebookRequest.SID)
 	if err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleRedo: could not getItemByID SID %d:  %s", rebookRequest.SID, err.Error()))
+		util.SvcErrorReturn(w, fmt.Errorf("handleRedo: could not getItemByID SID %d:  %s", rebookRequest.SID, err.Error()))
 		return
 	}
 	if queueItem.MachineID != rebookRequest.MachineID {
@@ -59,11 +60,11 @@ func handleRedo(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	log.Printf("handleRedo: processing %s command\n", d.cmd.Command)
 	simresDir, err := findSimulationDirectory(queueItem.SID)
 	if err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleRedo: error finding simulation results directory for SID %d: %s", queueItem.SID, err.Error()))
+		util.SvcErrorReturn(w, fmt.Errorf("handleRedo: error finding simulation results directory for SID %d: %s", queueItem.SID, err.Error()))
 	}
 	configDir := filepath.Join(app.QdConfigsDir, fmt.Sprintf("%d", queueItem.SID))
 	if err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleRedo: error finding config file: %s", err.Error()))
+		util.SvcErrorReturn(w, fmt.Errorf("handleRedo: error finding config file: %s", err.Error()))
 		return
 	}
 
@@ -72,7 +73,7 @@ func handleRedo(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	//-----------------------------------------------------------------------------
 	configFilename, err := findConfigFile(simresDir)
 	if err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleRedo: error finding config file: %s", err.Error()))
+		util.SvcErrorReturn(w, fmt.Errorf("handleRedo: error finding config file: %s", err.Error()))
 		return
 	}
 
@@ -80,7 +81,7 @@ func handleRedo(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	// Copy the config file to qdconfigs
 	//-----------------------------------------------------------------------------
 	if err := copyFile(configFilename, filepath.Join(configDir, filepath.Base(configFilename))); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleRedo: error copying config file: %s", err.Error()))
+		util.SvcErrorReturn(w, fmt.Errorf("handleRedo: error copying config file: %s", err.Error()))
 		return
 	}
 
@@ -94,7 +95,7 @@ func handleRedo(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	queueItem.DtEstimate.Valid = false
 	queueItem.DtEstimate.Time = time.Time{}
 	if err := app.qm.UpdateItem(queueItem); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleRedo: failed to update queue item"))
+		util.SvcErrorReturn(w, fmt.Errorf("handleRedo: failed to update queue item"))
 		return
 	}
 
@@ -102,7 +103,7 @@ func handleRedo(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	// Now remove the simulation results directory
 	//-----------------------------------------------------------------------------
 	if err := os.RemoveAll(simresDir); err != nil {
-		SvcErrorReturn(w, fmt.Errorf("handleRedo: failed to remove simulation results directory: %s", err.Error()))
+		util.SvcErrorReturn(w, fmt.Errorf("handleRedo: failed to remove simulation results directory: %s", err.Error()))
 		return
 	}
 
@@ -115,7 +116,7 @@ func handleRedo(w http.ResponseWriter, r *http.Request, d *HInfo) {
 		Message: "Re-queued",
 		ID:      queueItem.SID,
 	}
-	SvcWriteResponse(w, &msg)
+	util.SvcWriteResponse(w, &msg)
 
 	log.Printf("*** handleRedo:  SUCCESSFUL ***\n")
 }
