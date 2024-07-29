@@ -19,6 +19,59 @@ type SimdStatus struct {
 	MaxSimulations        int
 }
 
+// StatusResponse is a generic status reply to a query
+type StatusResponse struct {
+	Status  string
+	Message string
+}
+
+// PauseBooking sends a pause command to simd to stop booking new simulations.
+func PauseBooking(dcmd *CmdData, args []string) {
+	sendSimpleSimdCommand("/PauseBooking")
+}
+
+// ResumeBooking sends a pause command to simd to stop booking new simulations.
+func ResumeBooking(dcmd *CmdData, args []string) {
+	sendSimpleSimdCommand("/ResumeBooking")
+}
+
+func sendSimpleSimdCommand(cmd string) {
+	fullURL, err := util.BuildURL(app.SimdURL, cmd)
+	if err != nil {
+		fmt.Println("Error building URL:", err)
+		return
+	}
+	// Make the HTTP GET request
+	resp, err := http.Get(fullURL)
+	if err != nil {
+		fmt.Printf("Failed to contact simd @ %s: %v", fullURL, err)
+		return
+	}
+	defer resp.Body.Close()
+
+	// Read and parse the response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatalf("Failed to read response from simd: %v", err)
+		return
+	}
+
+	// Check if the HTTP status code indicates success
+	if resp.StatusCode != http.StatusOK {
+		log.Fatalf("Non-OK HTTP status: %v", resp.StatusCode)
+		return
+	}
+
+	// Unmarshal the JSON response into a SimdStatus struct
+	var reply StatusResponse
+	if err := json.Unmarshal(body, &reply); err != nil {
+		log.Fatalf("Failed to parse JSON response: %v", err)
+		return
+	}
+
+	fmt.Printf("status: %s\nmessage: %s\n", reply.Status, reply.Message)
+}
+
 // GetSimdStatus contacts the simd HTTP API to retrieve the current status.
 func GetSimdStatus(dcmd *CmdData, args []string) {
 	// Create the full URL for the status endpoint

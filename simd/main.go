@@ -141,6 +141,7 @@ func main() {
 	//-------------------------------------
 	go func() {
 		http.HandleFunc("/PauseBooking", PauseBookingHandler)
+		http.HandleFunc("/ResumeBooking", ResumeBookingHandler)
 		http.HandleFunc("/Shutdown", ShutdownHandler)
 		http.HandleFunc("/Status", StatusHandler)
 		http.HandleFunc("/CheckUpdates", CheckUpdatesHandler)

@@ -57,6 +57,8 @@ func init() {
 		{Command: "p|pri|priority", ArgCount: 2, Handler: setPriority, Help: "priority <sid> <priority> - set the priority for <sid> to <priority>"},
 		{Command: "q|quit", ArgCount: 0, Handler: handleExit, Help: "Exit the program"},
 		{Command: "r|redo", ArgCount: 1, Handler: handleRedo, Help: "redo <sid> - redo simulation <sid>"},
+		{Command: "sp|s-pause|simd-pause", ArgCount: 0, Handler: PauseBooking, Help: "tell simd to stop booking simulations"},
+		{Command: "sr|s-resume|simd-resume", ArgCount: 0, Handler: ResumeBooking, Help: "tell simd to stop booking simulations"},
 		{Command: "ss|s-status|simd-status", ArgCount: 0, Handler: GetSimdStatus, Help: "contact simd and show its status"},
 		{Command: "sid", ArgCount: 1, Handler: getSID, Help: "sid <sid> - list details for a simulation ID. Also works with just <sid>."},
 	}

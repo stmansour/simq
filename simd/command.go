@@ -39,12 +39,46 @@ func StatusHandler(w http.ResponseWriter, r *http.Request) {
 // PauseBookingHandler handles the PauseBooking command
 // -----------------------------------------------------------------------------
 func PauseBookingHandler(w http.ResponseWriter, r *http.Request) {
-	app.Paused = true
-	log.Printf("Booking paused at %s", time.Now().Format("2006-01-02 15:04:05"))
+	var msg string
+	var logmsg string
+
+	if !app.Paused {
+		app.Paused = true
+		msg = fmt.Sprintf("Booking paused at %s", time.Now().Format("2006-01-02 15:04:05"))
+		logmsg = fmt.Sprintf("Booking paused at %s", time.Now().Format("2006-01-02 15:04:05"))
+	} else {
+		msg = "Booking was already paused."
+		logmsg = msg
+	}
+
 	reply := StatusResponse{
 		Status:  "OK",
-		Message: fmt.Sprintf("Booking paused at %s", time.Now().Format("2006-01-02 15:04:05")),
+		Message: msg,
 	}
+	log.Printf("%s", logmsg)
+	util.SvcWriteResponse(w, &reply)
+}
+
+// ResumeBookingHandler handles the PauseBooking command
+// -----------------------------------------------------------------------------
+func ResumeBookingHandler(w http.ResponseWriter, r *http.Request) {
+	var msg string
+	var logmsg string
+
+	if app.Paused {
+		app.Paused = false
+		msg = fmt.Sprintf("Booking resumed at %s", time.Now().Format("2006-01-02 15:04:05"))
+		logmsg = msg
+	} else {
+		msg = "Booking mode was already in effect."
+		logmsg = msg
+	}
+
+	reply := StatusResponse{
+		Status:  "OK",
+		Message: msg,
+	}
+	log.Printf("%s", logmsg)
 	util.SvcWriteResponse(w, &reply)
 }
 
