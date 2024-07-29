@@ -51,7 +51,9 @@ fi
 # Set the owner of the simd files to the simd user
 echo "Changing ownership of /usr/local/simq/simd and /usr/local/simq/bin/psq..."
 sudo chown -R simd:simd /usr/local/simq
+sudo chown -R simd:simd "$SIMD_DIR"
 sudo chmod 775 "$SIMD_DIR"
+sudo chmod u+s /usr/local/simq/simd/simd
 
 # Get system information
 CPUS=$(sysctl -n hw.ncpu)
