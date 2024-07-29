@@ -14,3 +14,4 @@ cp dispatcher /usr/local/simq/dispatcher/
 # Start the dispatcher service
 #-----------------------------------
 sudo systemctl start plato.dispatcher.service
+

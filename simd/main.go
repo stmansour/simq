@@ -175,7 +175,7 @@ func main() {
 	if app.Paused {
 		log.Printf("Starting in paused mode. Will not book or recover simulations until pause is removed.\n")
 	} else {
-		log.Printf("Started in normal mode. Will book simulaations as they become available.\n")
+		log.Printf("Started in normal mode. Will book simulations as they become available.\n")
 	}
 
 	//-----------------------------------------------------
