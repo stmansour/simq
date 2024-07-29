@@ -70,7 +70,7 @@ cat <<EOF > "$CONFIG_FILE"
     "CPUArchitecture": "$CPU_ARCH",
     "MaxSimulations": 1,
     "SimdSimulationsDir": "/var/lib/simd",
-    "DispatcherURL": "http://192.168.5.100:8250/"
+    "DispatcherURL": "http://216.16.195.147:8250/"
 }
 EOF
 

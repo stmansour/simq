@@ -1,16 +1,19 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	"path"
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/stmansour/simq/util"
@@ -53,17 +56,19 @@ type SimulatorStatus struct {
 }
 
 var app struct {
-	cfg         SimdConfig   // configuration of this machine
-	listenPort  int          // port to listen on 8251 by default
-	sims        []Simulation // currently running simulations
-	simsMu      sync.Mutex   // mutex for updating sims
-	HexASCIIDbg bool         // if true print reply buffers in hex and ASCII
-	HTTPHdrsDbg bool         // if true print HTTP headers
-	version     bool         // program version string
-	simdHomeDir string       // home directory - typically /usr/local/simq/simd
-	mutex       sync.Mutex   // mutex for creating the tar.gz file
-	DtStart     time.Time    // start time of the program
-	Paused      bool         // when true, do not book any more simulations
+	cfg         SimdConfig         // configuration of this machine
+	listenPort  int                // port to listen on 8251 by default
+	sims        []Simulation       // currently running simulations
+	simsMu      sync.Mutex         // mutex for updating sims
+	HexASCIIDbg bool               // if true print reply buffers in hex and ASCII
+	HTTPHdrsDbg bool               // if true print HTTP headers
+	version     bool               // program version string
+	simdHomeDir string             // home directory - typically /usr/local/simq/simd
+	mutex       sync.Mutex         // mutex for creating the tar.gz file
+	DtStart     time.Time          // start time of the program
+	Paused      bool               // when true, do not book any more simulations
+	cancel      context.CancelFunc // used to shutdown smoothly
+	ctx         context.Context    // used to shutdown smoothly
 }
 
 func readCommandLineArgs() {
@@ -178,6 +183,19 @@ func main() {
 		log.Printf("Started in normal mode. Will book simulations as they become available.\n")
 	}
 
+	//-------------------------------------
+	// SETUP THE SHUTDOWN CHANNEL...
+	//-------------------------------------
+	app.ctx, app.cancel = context.WithCancel(context.Background())
+
+	// Signal handling for graceful shutdown
+	go func() {
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+		<-sigChan
+		app.cancel()
+	}()
+
 	//-----------------------------------------------------
 	// SEE IF WE NEED TO RESTORE ANY INTERRUPTED JOBS...
 	//-----------------------------------------------------
@@ -202,13 +220,21 @@ func main() {
 	//---------------------------------------------------------------
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
-	for range ticker.C {
-		if isAvailable() {
-			// fmt.Printf("simd >>>> isAvailable() reports: true\n") // debug
-			err := bookAndRunSimulation("Book", 0)
-			if err != nil {
-				log.Printf("Failed to book and run simulation: %v", err)
+
+	for {
+		select {
+		case <-ticker.C:
+			if isAvailable() {
+				// fmt.Printf("simd >>>> isAvailable() reports: true\n") // debug
+				err := bookAndRunSimulation("Book", 0)
+				if err != nil {
+					log.Printf("Failed to book and run simulation: %v", err)
+				}
 			}
+		case <-app.ctx.Done():
+			log.Println("Shutting down gracefully...")
+			// Perform any necessary cleanup here
+			return
 		}
 	}
 }

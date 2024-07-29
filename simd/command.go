@@ -86,8 +86,14 @@ func ResumeBookingHandler(w http.ResponseWriter, r *http.Request) {
 // -----------------------------------------------------------------------------
 func ShutdownHandler(w http.ResponseWriter, r *http.Request) {
 	// Placeholder implementation
-	fmt.Fprintln(w, "Shutdown command received")
-	log.Println("Shutdown command executed")
+	msg := "shutdown initiated"
+	reply := StatusResponse{
+		Status:  "OK",
+		Message: msg,
+	}
+	log.Printf("%s", msg)
+	util.SvcWriteResponse(w, &reply)
+	app.cancel()
 }
 
 // CheckUpdatesHandler handles the CheckUpdates command
