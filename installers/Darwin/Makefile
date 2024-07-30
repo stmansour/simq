@@ -13,5 +13,5 @@ test:
 	@echo "done in ${THISDIR}"
 
 package:
-	@cp macinstall.sh "${DIST}"
+	@cp macinstall.sh "${DIST}/simq/"
 	@echo "done in ${THISDIR}"
