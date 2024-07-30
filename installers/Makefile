@@ -1,15 +1,16 @@
-DIRS=linux macos
+DIRS=Linux Darwin
 THISDIR=installers
+OS=$(shell uname)
 
-doit:
+build:
 	@echo "Done in ${THISDIR}"
 
-package:
-	for dir in $(DIRS); do make -C $$dir package;done
-
 clean:
-	for dir in $(DIRS); do make -C $$dir clean;done
-
+	@echo "Done in ${THISDIR}"
 
 test:
 	@echo "Done in ${THISDIR}"
+
+package:
+	@for dir in $(DIRS); do if [ $$dir = $(OS) ]; then make -C $$dir package; fi ; done
+

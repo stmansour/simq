@@ -32,7 +32,7 @@ create_archive() {
     # Create the tar file
     echo "Creating tar file: $TARFILE"
     cd ./dist || exit 1
-    tar -czvf "$TARFILE" simq
+    tar -czvf "$TARFILE" simq *.sh
 
     # Generate the SHA-256 checksum
     if [ "$OS" == "macos" ]; then

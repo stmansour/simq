@@ -1,5 +1,5 @@
 # test comment
-DIRS=util data dispatcher psq simd
+DIRS=util data dispatcher psq simd installers
 DIST=dist 
 TEST_FAILURE_FILE=fail
 # Temporary file for storing start time
