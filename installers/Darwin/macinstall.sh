@@ -4,6 +4,16 @@ LOG_FILE="/tmp/macinstall.log"
 SIMD_DATA_DIR="/var/lib/simd"
 SIMQ_RELEASE_DIR="/usr/local/simq"
 CONFIG_FILE="${SIMQ_RELEASE_DIR}/simd/simdconf.json5"
+VERBOSE=0
+
+#---------------------------------------------------------------
+# Function to echo messages in verbose mode
+#---------------------------------------------------------------
+vecho() {
+    if [ $VERBOSE -eq 1 ]; then
+        echo "$@"
+    fi
+}
 
 #---------------------------------------------------------------
 # Function to check if the user has write permissions
@@ -15,12 +25,14 @@ CONFIG_FILE="${SIMQ_RELEASE_DIR}/simd/simdconf.json5"
 #---------------------------------------------------------------
 canWrite() {
     local path=$1
+    local X
 
     if [ -d "$path" ]; then
         # If it's a directory, check write permission
         if [ -w "$path" ]; then
             return 0
         else
+            vecho "(p1) You do not have write permissions to $path"
             return 1
         fi
     elif [ -f "$path" ]; then
@@ -28,6 +40,7 @@ canWrite() {
         if [ -w "$path" ]; then
             return 0
         else
+            vecho "(p2) You do not have write permissions to $path"
             return 1
         fi
     else
@@ -37,6 +50,7 @@ canWrite() {
         if [ -w "$dir" ]; then
             return 0
         else
+            vecho "(p3) You do not have write permissions to $path"
             return 1
         fi
     fi
@@ -46,15 +60,31 @@ canWrite() {
 # Start simd
 #------------------------------------------------
 start_simd_service() {
-    cd ${SIMQ_RELEASE_DIR}/simd || exit 1
+    cd "${SIMQ_RELEASE_DIR}/simd" || exit 1
     ./simd &
-    echo "simd started"
+    vecho "simd started"
 }
 
 #------------------------------------------------
-# first check if the user has write permissions
+# Process command-line options
 #------------------------------------------------
-if ! canWrite "/usr/local/simq" || ! canWrite "/usr/local" || ! canWrite "/var/lib/" || ! canWrite "/usr/local/simq/simd"; then
+while getopts "v" opt; do
+    case $opt in
+    v)
+        VERBOSE=1
+        ;;
+    *)
+        echo "Usage: $0 [-v]" >&2
+        exit 1
+        ;;
+    esac
+done
+
+#------------------------------------------------
+# Check if the user has write permissions
+#------------------------------------------------
+echo "Verifying write permissions..."
+if ! canWrite "/usr/local" || ! canWrite "/var/lib/" || ! canWrite "/usr/local/simq" || ! canWrite "/tmp/macinstall.log"; then
     echo "You do not have the necessary write permissions to install SimQ. Please re-run the installer with sudo."
     exit 1
 fi
@@ -63,48 +93,66 @@ fi
 # Redirect all output to the log file
 #------------------------------------------------
 exec > >(tee -a "$LOG_FILE") 2>&1
-echo "-----------------------------------------------------------------------------"
+vecho "-----------------------------------------------------------------------------"
+
+#------------------------------------------------
+# Make sure we are in the correct directory
+#------------------------------------------------
+if [ ! -d "./simd" ]; then
+    DIR=$(dirname "$0")
+    vecho "Changing directory to $DIR..."
+    cd "$DIR" || exit 1
+    if [ ! -d "./simd" ]; then
+        echo "This script must be run from the directory containing macinstall.sh, simd/, and bin/"
+        exit 1
+    fi
+fi
 
 #------------------------------------------------
 # Stop any running instances of psq and simd
 #------------------------------------------------
-echo -n "Checking for running instances of psq...  "
+vecho "Checking for running instances of psq..."
 psqs=$(pgrep psq)
-if [ "X${psqs}" != "X" ]; then
-    COUNT=$(echo $psqs | wc -l)
-    echo "found $COUNT instances.  Terminating..."
+if [ -n "$psqs" ]; then
+    COUNT=$(echo "$psqs" | wc -l)
+    vecho "Found $COUNT instances of psq. Terminating..."
     killall psq
 else
-    echo "none found"
+    vecho "No running instances of psq found."
 fi
 
-echo -n "Checking for running instances of simd...  "
+vecho "Checking for running instances of simd..."
 simds=$(pgrep simd)
-if [ "X${simds}" != "X" ]; then
-    echo "found. Shutting down simd..."
-    resp=$(curl http://localhost:8251/Shutdown)
+if [ -n "$simds" ]; then
+    vecho "Found simd. Shutting down simd..."
+    resp=$(curl -s http://localhost:8251/Shutdown)
     sleep 1
     simds=$(pgrep simd)
-    if [ "X${simds}" != "X" ]; then
-        echo "killing all simd instances"
+    if [ -n "$simds" ]; then
+        vecho "Killing all remaining simd instances..."
         killall simd
     fi
 else
-    echo "none found"
+    vecho "No running instances of simd found."
 fi
 
 #------------------------------------------------
-# Now extract the updated files...
+# Now extract the updated files if needed...
 #------------------------------------------------
-tar xvf simq.*.tar.gz -C /usr/local
+if [ "$CWD" != "$SIMQ_RELEASE_DIR" ]; then
+    vecho "Extracting files to $SIMQ_RELEASE_DIR..."
+    mkdir -p $SIMQ_RELEASE_DIR
+    cp -r ./simd "$SIMQ_RELEASE_DIR"/
+    cp -r ./bin "$SIMQ_RELEASE_DIR"/
+fi
 
 #------------------------------------------------
 # Ensure that we have the simd user and group...
 #------------------------------------------------
 if id "simd" &>/dev/null; then
-    echo "User 'simd' already exists."
+    vecho "User 'simd' already exists."
 else
-    echo "Creating user 'simd'..."
+    vecho "Creating user 'simd'..."
     next_uid=$(dscl . -list /Users UniqueID | awk '{uid[$2]=1} END {for (i=501; i<600; i++) if (!uid[i]) {print i; exit}}')
     sudo dscl . -create /Users/simd
     sudo dscl . -create /Users/simd UserShell /usr/bin/false
@@ -120,38 +168,35 @@ fi
 # Ensure the group 'simd' exists and set the correct GID
 #---------------------------------------------------------------
 if ! dscl . -list /Groups PrimaryGroupID | grep -q "simd"; then
-    echo "Creating group 'simd' with GID $next_gid..."
+    vecho "Creating group 'simd' with GID $next_gid..."
     next_gid=$(dscl . -list /Groups PrimaryGroupID | awk '{gid[$2]=1} END {for (i=1000; i<60000; i++) if (!gid[i]) {print i; exit}}')
     sudo dscl . -create /Groups/simd
     sudo dscl . -create /Groups/simd PrimaryGroupID "$next_gid"
     sudo dscl . -append /Groups/simd GroupMembership simd
 else
-    echo "Group 'simd' already exists."
+    vecho "Group 'simd' already exists."
     next_gid=$(dscl . -read /Groups/simd PrimaryGroupID | awk '{print $2}')
 fi
 
 #---------------------------------------------------------------
 # Update PrimaryGroupID for user 'simd' to match group 'simd'
 #---------------------------------------------------------------
-echo "Updating PrimaryGroupID for user 'simd' to match group 'simd'..."
+vecho "Updating PrimaryGroupID for user 'simd' to match group 'simd'..."
 sudo dscl . -create /Users/simd PrimaryGroupID "$next_gid"
 
 #------------------------------------------------
 # Ensure /var/lib/simd exists
 #------------------------------------------------
 if [ ! -d "$SIMD_DATA_DIR" ]; then
-    echo "Creating $SIMD_DATA_DIR..."
+    vecho "Creating $SIMD_DATA_DIR..."
     sudo mkdir -p "$SIMD_DATA_DIR"
     sudo chown -R simd:simd "$SIMD_DATA_DIR"
 fi
 
 #---------------------------------------------------------------
 # Set the owner of the simq released files to the simd user
-# Allow for group write access to make life easier for the
-# user who needs to look after these files. They should add
-# themselves to group 'simd'.
 #---------------------------------------------------------------
-echo "Setting ownership of ${SIMQ_RELEASE_DIR} and ${SIMD_DATA_DIR} to 'simd'..."
+vecho "Setting ownership of ${SIMQ_RELEASE_DIR} and ${SIMD_DATA_DIR} to 'simd'..."
 sudo chown -R simd:simd "$SIMQ_RELEASE_DIR"
 sudo chown -R simd:simd "$SIMD_DATA_DIR"
 sudo chmod -R 775 "$SIMD_DATA_DIR"
@@ -167,7 +212,7 @@ if [ ! -f "${SIMD_DATA_DIR}/simdconf.json5" ]; then
     MEMORY_GB=$(echo "scale=0; $MEMORY / (1024^3)" | bc)
     CPU_ARCH=$(uname -m)
 
-    echo "Creating config file $CONFIG_FILE..."
+    vecho "Creating config file $CONFIG_FILE..."
     cat <<EOF >"$CONFIG_FILE"
 {
     "CPUs": $CPUS,

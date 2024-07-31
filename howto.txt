@@ -1,0 +1,75 @@
+PLATO System Design
+
+The PLATO system is comprised of several tools that can interact
+over a network. Here are the main applications in the PLATO system
+and their function:
+
+1. simulator: The PLATO Simulator is an investment engine focused
+on predicting currency movements by simulating investors and
+influencers using historical and real-time data. It employs genetic
+algorithms to optimize investment strategies by evolving simulated
+entities over generations, aiming to identify the most profitable
+configurations.  The system is highly scriptable, using a JSON5
+configuration file, and includes specialized operational modes for
+detailed analysis and robustness testing.
+
+2. dispatcher: The dispatcher in the PLATO system manages the queue
+of defined simulations, assigning them to available compute resources
+and monitoring their progress. It ensures efficient use of both
+company servers and cloud-based resources, prioritizing simulations
+based on user-defined priorities. The dispatcher tracks simulation
+states, handles error recovery through the simd daemon, and archives
+all simulation results for further analysis.
+
+3. simd: The simd daemon operates on all hardware capable of running
+PLATO simulations, coordinating with the dispatcher to execute
+assigned simulations. It manages the initiation, monitoring, and
+completion of simulations, ensuring results are transferred back
+to the dispatcher. Simd also handles error recovery, including
+network interruptions and premature terminations, to maintain smooth
+and continuous simulation operations.
+
+4. psq: The psq client allows users to submit simulation jobs to
+the dispatcher by providing a configuration file. Users can set
+priorities for these jobs, which the dispatcher uses to determine
+the order of execution. PSQ also enables users to view and filter
+the queue of pending, active, and completed simulations, helping
+manage and monitor the simulation workload efficiently.
+
+5. simtalk: Simtalk is a communication tool that allows users to
+interact with running instances of the simulator to provide real-time
+status updates and control. It supports commands such as status,
+which reports on the progress and estimated completion time of
+simulations, and stopsim, which instructs the simulator to halt
+after the current generation completes. This facilitates monitoring
+and managing long-running simulations, ensuring efficient use of
+resources and timely adjustments as needed.
+
+
+RELEASE LOCATIONS
+=================
+
+Program        Release Directory          Private Directory
+-------------- -------------------------- ---------------------------
+dispatcher     /usr/local/simq/dispatcher /var/lib/dispatcher
+gfetch         /usr/ocal/plato/bin
+gsync          /usr/ocal/plato/bin
+psq            /usr/local/simq/bin
+psync          /usr/local/plato/bin
+simulator      /usr/local/plato/bin
+simd           /usr/local/simq/simd       /var/lib/simd
+simtalk        /usr/local/plato/bin
+sqltocsv       /usr/local/plato/bin
+
+
+HOW TO MAKE RELEASES
+====================
+
+1. 'make all'
+   This will build and test everything and if there are no errors in the
+   testing it will create a distribution tar.gz file.
+2. 'make post'
+   Posts the file onto the plato server where it can be downloaded for
+   installation.  Remember to run ./doit.sh on plato after uploading new
+   content here.
+
