@@ -10,7 +10,7 @@ dispatcher: *.go
 	go vet
 	golint
 	staticcheck
-	go build -ldflags "-X 'github.com/stmansour/simq/util.buildID=$(BUILD_TIME)'" -o dispatcher
+	go build -ldflags "-X 'github.com/stmansour/simq/util.BuildID=$(BUILD_TIME)'" -o dispatcher
 	@echo "*** $(THISDIR): completed $(THISDIR) ***"
 
 clean:

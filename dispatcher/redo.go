@@ -31,6 +31,7 @@ import (
 func handleRedo(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	var queueItem data.QueueItem
 	var err error
+	archiveMissing := false
 	//---------------------------------------------------
 	// Decode the Redo
 	//     Cmd: "Redo"
@@ -62,11 +63,7 @@ func handleRedo(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	if err != nil {
 		util.SvcErrorReturn(w, fmt.Errorf("handleRedo: error finding simulation results directory for SID %d: %s", queueItem.SID, err.Error()))
 	}
-	configDir := filepath.Join(app.QdConfigsDir, fmt.Sprintf("%d", queueItem.SID))
-	if err != nil {
-		util.SvcErrorReturn(w, fmt.Errorf("handleRedo: error finding config file: %s", err.Error()))
-		return
-	}
+	qdconfigDir := filepath.Join(app.QdConfigsDir, fmt.Sprintf("%d", queueItem.SID))
 
 	//-----------------------------------------------------------------------------
 	// Determine the config filename
@@ -74,15 +71,25 @@ func handleRedo(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	configFilename, err := findConfigFile(simresDir)
 	if err != nil {
 		util.SvcErrorReturn(w, fmt.Errorf("handleRedo: error finding config file: %s", err.Error()))
-		return
+		archiveMissing = true // it might still be in qdconfigs
 	}
 
-	//-----------------------------------------------------------------------------
-	// Copy the config file to qdconfigs
-	//-----------------------------------------------------------------------------
-	if err := copyFile(configFilename, filepath.Join(configDir, filepath.Base(configFilename))); err != nil {
-		util.SvcErrorReturn(w, fmt.Errorf("handleRedo: error copying config file: %s", err.Error()))
-		return
+	if archiveMissing {
+		// It might be in qdconfigDir. Check to see if it is...
+		configFilename, err = findConfigFile(qdconfigDir)
+		if err != nil {
+			util.SvcErrorReturn(w, fmt.Errorf("handleRedo: error finding config file: %s. Could not find the config file for SID %d, no way to redo", err.Error(), queueItem.SID))
+			return
+		}
+		log.Printf("handleRedo: found config file %s in %s. Continuing with redo.\n", configFilename, qdconfigDir)
+	} else {
+		//-----------------------------------------------------------------------------
+		// Copy the config file to qdconfigs
+		//-----------------------------------------------------------------------------
+		if err := copyFile(configFilename, filepath.Join(qdconfigDir, filepath.Base(configFilename))); err != nil {
+			util.SvcErrorReturn(w, fmt.Errorf("handleRedo: error copying config file: %s", err.Error()))
+			return
+		}
 	}
 
 	//-----------------------------------------------------------------------------
@@ -102,9 +109,11 @@ func handleRedo(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	//-----------------------------------------------------------------------------
 	// Now remove the simulation results directory
 	//-----------------------------------------------------------------------------
-	if err := os.RemoveAll(simresDir); err != nil {
-		util.SvcErrorReturn(w, fmt.Errorf("handleRedo: failed to remove simulation results directory: %s", err.Error()))
-		return
+	if !archiveMissing {
+		if err := os.RemoveAll(simresDir); err != nil {
+			util.SvcErrorReturn(w, fmt.Errorf("handleRedo: failed to remove simulation results directory: %s", err.Error()))
+			return
+		}
 	}
 
 	//-----------------------------------------------------------------------------

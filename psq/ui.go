@@ -5,11 +5,11 @@ import (
 	"os"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/fatih/color"
 	"github.com/mattn/go-runewidth"
 	"github.com/stmansour/simq/data"
+	"github.com/stmansour/simq/util"
 	terminal "golang.org/x/term"
 )
 
@@ -33,7 +33,7 @@ func printStartupMessage() {
 	message = append(message, logo...)
 	message = append(message,
 		"",
-		fmt.Sprintf("   Version 1.0 | %s", time.Now().Format("2006-01-02 15:04:05")),
+		fmt.Sprintf("   Version %s | %s", util.VersionMajorMinor(), util.VersionInfo.BuildID),
 		fmt.Sprintf("   Dispatcher: %s", app.DispatcherURL),
 		fmt.Sprintf("   Working Dir: %s", getCurrentDirectory()),
 		"",

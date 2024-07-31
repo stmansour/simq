@@ -9,7 +9,7 @@ simd: *.go
 	go vet
 	golint
 	staticcheck
-	go build -ldflags "-X 'github.com/stmansour/simq/util.buildID=$(BUILD_TIME)'" -o simd
+	go build -ldflags "-X 'github.com/stmansour/simq/util.BuildID=$(BUILD_TIME)'" -o simd
 	@echo "*** $(THISDIR): completed $(THISDIR) ***"
 
 clean:
