@@ -119,7 +119,8 @@ func main() {
 	//-------------------------------------
 	readCommandLineArgs()
 	if app.version {
-		fmt.Println("simd version:", util.Version())
+		s := util.Version()
+		fmt.Printf("Version: %s\n", s)
 		os.Exit(0)
 	}
 	app.HTTPHdrsDbg = app.HexASCIIDbg
