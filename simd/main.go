@@ -80,6 +80,19 @@ func readCommandLineArgs() {
 
 func main() {
 	var err error
+	app.listenPort = 8251
+	app.Paused = false // this is the default, but I want to be very explicit about this
+	app.HTTPHdrsDbg = app.HexASCIIDbg
+
+	//-------------------------------------
+	// HANDLE COMMAND LINE ARGUMENTS
+	//-------------------------------------
+	readCommandLineArgs()
+	if app.version {
+		s := util.Version()
+		fmt.Printf("Version: %s\n", s)
+		os.Exit(0)
+	}
 
 	//-----------------------------------------
 	// OUTPUT MESSAGES TO A LOGFILE
@@ -88,9 +101,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to get executable directory: %v", err)
 	}
-
-	app.listenPort = 8251
-	app.Paused = false // this is the default, but I want to be very explicit about this
 
 	fname := filepath.Join(app.simdHomeDir, "simd.log")
 	logFile, err := os.OpenFile(fname, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
@@ -113,17 +123,6 @@ func main() {
 	if err = loadConfig(fname, &app.cfg); err != nil {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
-
-	//-------------------------------------
-	// HANDLE COMMAND LINE ARGUMENTS
-	//-------------------------------------
-	readCommandLineArgs()
-	if app.version {
-		s := util.Version()
-		fmt.Printf("Version: %s\n", s)
-		os.Exit(0)
-	}
-	app.HTTPHdrsDbg = app.HexASCIIDbg
 
 	//-------------------------------------
 	// GET MY IP ADDRESS
