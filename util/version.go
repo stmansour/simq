@@ -22,7 +22,7 @@ var VersionInfo = struct {
 
 // Version returns the version string for this build
 func Version() string {
-	return fmt.Sprintf("%d.%d-%s", VersionInfo.MajorVersion, VersionInfo.MinorVersion, VersionInfo.BuildID)
+	return fmt.Sprintf("%d.%d-%s", VersionInfo.MajorVersion, VersionInfo.MinorVersion, BuildID)
 }
 
 // VersionMajorMinor returns only the Major.Minor version number
