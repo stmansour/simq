@@ -15,53 +15,12 @@ vecho() {
     fi
 }
 
-#---------------------------------------------------------------
-# Function to check if the user has write permissions
-#
-# INPUTS
-# $1 - The path to check
-#
-# RETURNS - 0 if the user has write permissions, 1 otherwise
-#---------------------------------------------------------------
-canWrite() {
-    local path=$1
-    local X
-
-    if [ -d "$path" ]; then
-        # If it's a directory, check write permission
-        if [ -w "$path" ]; then
-            return 0
-        else
-            vecho "(p1) You do not have write permissions to $path"
-            return 1
-        fi
-    elif [ -f "$path" ]; then
-        # If it's a file, check if it exists and is writable
-        if [ -w "$path" ]; then
-            return 0
-        else
-            vecho "(p2) You do not have write permissions to $path"
-            return 1
-        fi
-    else
-        # If the path does not exist, check if the user can create a file in the directory
-        local dir
-        dir=$(dirname "$path")
-        if [ -w "$dir" ]; then
-            return 0
-        else
-            vecho "(p3) You do not have write permissions to $path"
-            return 1
-        fi
-    fi
-}
-
 #------------------------------------------------
 # Start simd
 #------------------------------------------------
 start_simd_service() {
-    cd "${SIMQ_RELEASE_DIR}/simd" || exit 1
-    ./simd &
+    systemctl start simd
+    systemctl status simd
     vecho "simd started"
 }
 
