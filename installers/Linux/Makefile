@@ -13,5 +13,5 @@ test:
 	@echo "done in ${THISDIR}"
 
 package:
-	@cp linuxinstall.sh "${DIST}/simq/"
+	cp linuxinstall.sh "${DIST}/simq/"
 	@echo "done in ${THISDIR}"
