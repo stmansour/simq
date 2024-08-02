@@ -75,24 +75,21 @@ psqs=$(pgrep psq)
 if [ -n "$psqs" ]; then
     COUNT=$(echo "$psqs" | wc -l)
     vecho "Found $COUNT instances of psq. Terminating..."
-    killall psq
-else
-    vecho "No running instances of psq found."
-fi
-
-vecho "Checking for running instances of simd..."
-simds=$(pgrep simd)
-if [ -n "$simds" ]; then
-    vecho "Found simd. Shutting down simd..."
-    resp=$(curl -s http://localhost:8251/Shutdown)
-    sleep 1
-    simds=$(pgrep simd)
-    if [ -n "$simds" ]; then
-        vecho "Killing all remaining simd instances..."
-        killall simd
+    #---------------------------------------
+    # try to shutdown gracefully first
+    #---------------------------------------
+    systemctl stop simd
+    if systemctl is-active --quiet simd; then
+        #---------------------------------------
+        # try to shutdown gracefully first
+        #---------------------------------------
+        vecho "Failed to stop simd service gracefully. Forcing shutdown..."
+        sudo killall simd
+    else
+        vecho "simd service stopped successfully."
     fi
 else
-    vecho "No running instances of simd found."
+    vecho "No running instances of psq found."
 fi
 
 #------------------------------------------------
