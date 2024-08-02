@@ -68,13 +68,23 @@ if [ ! -d "./simd" ]; then
 fi
 
 #------------------------------------------------
-# Stop any running instances of psq and simd
+# STOP ALL PSQs
 #------------------------------------------------
 vecho "Checking for running instances of psq..."
 psqs=$(pgrep psq)
 if [ -n "$psqs" ]; then
     COUNT=$(echo "$psqs" | wc -l)
     vecho "Found $COUNT instances of psq. Terminating..."
+    killall psq
+ else
+    vecho "No running instances of psq found."
+fi
+
+#------------------------------------------------
+# STOP SIMD
+#------------------------------------------------
+if systemctl is-active --quiet simd; then
+    vecho "Attempting to stop simd daemon..."
     #---------------------------------------
     # try to shutdown gracefully first
     #---------------------------------------
@@ -89,7 +99,7 @@ if [ -n "$psqs" ]; then
         vecho "simd service stopped successfully."
     fi
 else
-    vecho "No running instances of psq found."
+    vecho "No running instances of simd found."
 fi
 
 #------------------------------------------------
