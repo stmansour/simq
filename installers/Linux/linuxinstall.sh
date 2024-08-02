@@ -81,7 +81,7 @@ if [ -n "$psqs" ]; then
     systemctl stop simd
     if systemctl is-active --quiet simd; then
         #---------------------------------------
-        # try to shutdown gracefully first
+        # At this point, just kill it
         #---------------------------------------
         vecho "Failed to stop simd service gracefully. Forcing shutdown..."
         sudo killall simd
