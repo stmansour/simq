@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/user"
 	"path/filepath"
 
 	json5 "github.com/yosuke-furukawa/json5/encoding/json5"
@@ -72,7 +71,6 @@ func (a *ExternalResources) GetSQLOpenString(dbname string) string {
 // ReadExternalResources reads the contents of extres.json5 and fills the ExternalResources struct.
 func ReadExternalResources() (*ExternalResources, error) {
 	fname := "extres.json5"
-	found := false
 	//---------------------------------------------
 	// Initialize to something reasonable...
 	//---------------------------------------------
@@ -98,24 +96,11 @@ func ReadExternalResources() (*ExternalResources, error) {
 			if err != nil {
 				return &resources, err
 			}
-			found = true
 
 			fname = filepath.Join(exdir, fname)
 			if _, err = os.Stat(fname); err != nil {
-				if !os.IsNotExist(err) {
-					return &resources, err // error is something other than "doesn't exist"
-				}
-				found = false
+				return &resources, err // error is something other than "doesn't exist"
 			}
-		}
-
-		if !found {
-			currentUser, err := user.Current()
-			if err != nil {
-				return &resources, err
-			}
-			resources.DbUser = currentUser.Username
-			return &resources, nil
 		}
 	}
 

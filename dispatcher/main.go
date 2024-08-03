@@ -79,6 +79,7 @@ func doMain() {
 	//-----------------------------------------
 	ex, err := util.ReadExternalResources()
 	if err != nil {
+		fmt.Printf("Failed to read external resources: %v\n", err)
 		log.Fatalf("Failed to read external resources: %v", err)
 	}
 	if ex, err = util.LoadConfig(ex, "dispatcher.json5"); err != nil {
