@@ -36,8 +36,7 @@ func handleRedo(w http.ResponseWriter, r *http.Request, d *HInfo) {
 	// Decode the Redo
 	//     Cmd: "Redo"
 	//     Username: "whoever"
-	//     Data:  {"SID": 1234}
-	//     MachineID: "A7B8C9"
+	//     Data:  {"SID": 1234, "MachineID": "A7B8C9"}
 	//---------------------------------------------------
 	var rebookRequest SimulationRebookRequest
 	log.Printf("handling REDO command\n")

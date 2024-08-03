@@ -94,7 +94,7 @@ func GetNetworkInfo() ([]NetworkInfo, error) {
 
 // GetMacUUID returns the UUID of the current machine on macOS
 func GetMacUUID() (string, error) {
-	cmd := exec.Command("ioreg", "-rd1", "-c", "IOPlatformExpertDevice")
+	cmd := exec.Command("/usr/sbin/ioreg", "-rd1", "-c", "IOPlatformExpertDevice")
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	err := cmd.Run()

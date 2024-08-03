@@ -194,6 +194,7 @@ func bookAndRunSimulation(bkcmd string, sid int64) error {
 
 				out, err := os.Create(FQConfigFileName)
 				if err != nil {
+					log.Printf("Error creating config file: %v\n", err)
 					return fmt.Errorf("bookAndRunSimulation: failed to create config file: %v", err)
 				}
 				defer out.Close()

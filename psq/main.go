@@ -54,6 +54,7 @@ func init() {
 		{Command: "help|?", ArgCount: 0, Handler: handleHelp, Help: "Show this help message"},
 		{Command: "i|info", ArgCount: 0, Handler: handleInfo, Help: "Show psq's internal settings"},
 		{Command: "l|list", ArgCount: 0, Handler: listJobs, Help: "List pending simulations"},
+		{Command: "loc|local", ArgCount: 0, Handler: handleLocal, Help: "switch to a local dispatcher (for development testing only)"},
 		{Command: "p|pri|priority", ArgCount: 2, Handler: setPriority, Help: "priority <sid> <priority> - set the priority for <sid> to <priority>"},
 		{Command: "q|quit", ArgCount: 0, Handler: handleExit, Help: "Exit the program"},
 		{Command: "r|redo", ArgCount: 1, Handler: handleRedo, Help: "redo <sid> - redo simulation <sid>"},
@@ -225,6 +226,9 @@ func setDispatcherURL(cmd *CmdData, args []string) {
 	var err error
 	var url string
 	if len(args) > 0 && len(args[0]) > 0 {
+		if args[0] == "local" {
+			args[0] = "http://localhost:8250"
+		}
 		if url, err = JoinURL(args[0], "command"); err != nil {
 			fmt.Printf("Error joining dispatcher URL: %v\n", err)
 			return
@@ -253,4 +257,17 @@ func handleInfo(cmd *CmdData, args []string) {
 	fmt.Printf("       PSQ version: %s\n", util.Version())
 	fmt.Printf("dispatcher address: %s\n", app.DispatcherHost)
 	fmt.Printf("      simd address: %s\n", app.SimdURL)
+}
+
+// handleInfo displays info about this running psq instance
+func handleLocal(cmd *CmdData, args []string) {
+	var err error
+	var url string
+	app.DispatcherHost = "http://localhost:8250"
+	if url, err = JoinURL(app.DispatcherHost, "command"); err != nil {
+		fmt.Printf("Error joining dispatcher URL: %v\n", err)
+		return
+	}
+	app.DispatcherURL = url
+	fmt.Printf("Dispatcher URL set to: %s\n", app.DispatcherURL)
 }
