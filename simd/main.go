@@ -121,7 +121,9 @@ func main() {
 	//-------------------------------------
 	fname = filepath.Join(app.simdHomeDir, "simdconf.json5")
 	if err = loadConfig(fname, &app.cfg); err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
+		fmt.Printf("Failed to load configuration: %v\n", err)
+		log.Printf("Failed to load configuration: %v\n", err)
+		log.Fatalf("Shutting down. Please put simdconf.json5 in the same directory as simd\n")
 	}
 
 	//-------------------------------------
