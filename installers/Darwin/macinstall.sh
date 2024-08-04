@@ -25,7 +25,6 @@ vecho() {
 #---------------------------------------------------------------
 canWrite() {
     local path=$1
-    local X
 
     if [ -d "$path" ]; then
         # If it's a directory, check write permission
@@ -125,7 +124,7 @@ vecho "Checking for running instances of simd..."
 simds=$(pgrep simd)
 if [ -n "$simds" ]; then
     vecho "Found simd. Shutting down simd..."
-    resp=$(curl -s http://localhost:8251/Shutdown)
+    curl -s http://localhost:8251/Shutdown
     sleep 1
     simds=$(pgrep simd)
     if [ -n "$simds" ]; then
@@ -233,7 +232,7 @@ fi
 
 # Prompt the user to start the simd service
 while true; do
-    read -p "Do you want to start the simd service now? [Y/n] " response
+    read -rp "Do you want to start the simd service now? [Y/n] " response
     case $response in
     [Yy])
         start_simd_service

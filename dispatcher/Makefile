@@ -33,13 +33,9 @@ coverage:
 	go tool cover -html=coverage.out 
 
 package:
-ifeq ($(OS),Darwin)
-	@echo "Skipping package commands on macOS."
-else
-	mkdir -p ${BINDIR}/dispatcher
-	cp dispatcher ${BINDIR}/dispatcher/
+	mkdir -p ${TOP}/dist2/simq/dispatcher
+	cp dispatcher ${TOP}/dist2/simq/dispatcher/
 	@echo "*** ${THISDIR}: completed package ***"
-endif
 
 release: config
 	mkdir -p /usr/local/simq/dispatcher/

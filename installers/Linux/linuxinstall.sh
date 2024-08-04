@@ -192,7 +192,7 @@ fi
 
 # Prompt the user to start the simd service
 while true; do
-    read -p "Do you want to start the simd service now? [Y/n] " response
+    read -rp "Do you want to start the simd service now? [Y/n] " response
     case $response in
     [Yy])
         start_simd_service

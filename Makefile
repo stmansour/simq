@@ -19,7 +19,7 @@ deps:
 
 
 clean:
-	rm -rf dist
+	rm -rf dist dist2
 	for dir in $(DIRS); do make -C $$dir clean;done
 
 test: do_tests check_tests

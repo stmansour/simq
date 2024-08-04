@@ -183,7 +183,7 @@ func commandDispatcher(w http.ResponseWriter, r *http.Request) {
 	//--------------------
 	// DEBUGGING
 	//--------------------
-	log.Printf("\tDispatcher: >>>> received command: %s, username: %s", cmd.Command, cmd.Username)
+	// log.Printf("\tDispatcher: >>>> received command: %s, username: %s", cmd.Command, cmd.Username)
 
 	//---------------------------------------------------------------
 	// Access the handler table without mutex since it's read-only
