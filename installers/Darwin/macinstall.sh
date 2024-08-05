@@ -79,12 +79,12 @@ while getopts "v" opt; do
     esac
 done
 
-#------------------------------------------------
-# Check if the user has write permissions
-#------------------------------------------------
-echo "Verifying write permissions..."
-if ! canWrite "/usr/local" || ! canWrite "/var/lib/" || ! canWrite "/usr/local/simq" || ! canWrite "/tmp/macinstall.log"; then
-    echo "You do not have the necessary write permissions to install SimQ. Please re-run the installer with sudo."
+#--------------------------------------------------------------------------------------------
+# Ensure the script is running as root. It needs to be root because there are commands that 
+# create users and groups.
+#--------------------------------------------------------------------------------------------
+if [ "$EUID" -ne 0 ]; then
+    echo "This script must be run as root. Please use sudo or run as root user."
     exit 1
 fi
 
