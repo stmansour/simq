@@ -14,6 +14,6 @@ test:
 
 package:
 	@mkdir -p ${TOP}/dist2/simq
-	@cp -r ${THISDIR}/linuxdispintall.sh ${TOP}/dist2/simq
+	@cp  linuxdispinstall.sh ${TOP}/dist2/simq
 	@cp linuxinstall.sh "${DIST}/simq/"
 	@echo "done in ${THISDIR}"
