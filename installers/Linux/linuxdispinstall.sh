@@ -1,10 +1,18 @@
 #!/bin/bash
 
-LOG_FILE="/tmp/macinstall.log"
+LOG_FILE="/tmp/dispatcher_install.log"
 DISPATCHER_DATA_DIR="/var/lib/dispatcher"
 SIMQ_RELEASE_DIR="/usr/local/simq"
 CONFIG_FILE="${SIMQ_RELEASE_DIR}/dispatcher/dispatcherconf.json5"
 VERBOSE=0
+
+# MySQL root credentials (adjust as necessary)
+MYSQL_ROOT_USER="root"
+MYSQL_ROOT_PASSWORD="root_password"
+
+# Dispatcher MySQL credentials
+DISPATCHER_MYSQL_USER="dispatcher"
+DATABASE_NAME="simq"
 
 #---------------------------------------------------------------
 # Function to echo messages in verbose mode
@@ -176,6 +184,24 @@ EOF
     echo "Please edit this file to customize your configuration:   sudo vi ${CONFIG_FILE}"
     echo
 fi
+
+#------------------------------------------------
+# Setup MySQL user and database
+#------------------------------------------------
+vecho "Setting up MySQL user and database..."
+mysql -u$MYSQL_ROOT_USER -p$MYSQL_ROOT_PASSWORD <<EOF
+-- Create the database if it doesn't exist
+CREATE DATABASE IF NOT EXISTS $DATABASE_NAME;
+
+-- Create the dispatcher user if it doesn't exist and grant privileges
+CREATE USER IF NOT EXISTS '$DISPATCHER_MYSQL_USER'@'localhost' IDENTIFIED BY '$DISPATCHER_MYSQL_PASSWORD';
+GRANT ALL PRIVILEGES ON $DATABASE_NAME.* TO '$DISPATCHER_MYSQL_USER'@'localhost';
+
+-- Apply the changes
+FLUSH PRIVILEGES;
+EOF
+
+vecho "MySQL user and database setup completed."
 
 # Prompt the user to start the dispatcher service
 while true; do
