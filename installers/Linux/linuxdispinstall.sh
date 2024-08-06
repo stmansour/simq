@@ -3,7 +3,7 @@
 LOG_FILE="/tmp/dispatcher_install.log"
 DISPATCHER_DATA_DIR="/var/lib/dispatcher"
 SIMQ_RELEASE_DIR="/usr/local/simq"
-CONFIG_FILE="${SIMQ_RELEASE_DIR}/dispatcher/dispatcherconf.json5"
+CONFIG_FILE="${SIMQ_RELEASE_DIR}/dispatcher/dispatcher.json5"
 VERBOSE=0
 
 # MySQL root credentials (adjust as necessary)

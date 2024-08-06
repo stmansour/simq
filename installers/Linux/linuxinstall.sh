@@ -4,6 +4,7 @@ LOG_FILE="/tmp/macinstall.log"
 SIMD_DATA_DIR="/var/lib/simd"
 SIMQ_RELEASE_DIR="/usr/local/simq"
 CONFIG_FILE="${SIMQ_RELEASE_DIR}/simd/simdconf.json5"
+SERVICE_FILE="/etc/systemd/system/simd.service"
 VERBOSE=0
 
 #---------------------------------------------------------------
@@ -190,6 +191,37 @@ EOF
     echo
 fi
 
+#------------------------------------------------
+# Create systemd service file for simd
+#------------------------------------------------
+vecho "Creating systemd service file for simd..."
+cat <<EOF | sudo tee "$SERVICE_FILE" > /dev/null
+[Unit]
+Description=Simd Service
+After=network.target
+
+[Service]
+ExecStart=${SIMQ_RELEASE_DIR}/simd/simd
+User=simd
+Group=simd
+Restart=always
+WorkingDirectory=${SIMQ_RELEASE_DIR}/simd
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=simd
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Enable and start the simd service
+sudo systemctl daemon-reload
+sudo systemctl enable simd
+sudo systemctl start simd
+sudo systemctl status simd
+
+vecho "simd service created and started."
+
 # Prompt the user to start the simd service
 while true; do
     read -rp "Do you want to start the simd service now? [Y/n] " response
@@ -213,3 +245,4 @@ while true; do
 done
 
 echo "Installation complete!"
+
